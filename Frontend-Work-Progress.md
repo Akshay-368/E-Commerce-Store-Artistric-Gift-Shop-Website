@@ -12,7 +12,8 @@ And then created an asset folder in the `src` using `mkdir assets`.
 ## June 01, 2026 — Admin shell & pages added
 - Added admin area under `src/app/admin/` with this structure:
 
-	src/app/admin/
+```
+src/app/admin/
 	├── services/
 	│   └── admin-auth.service.ts       (JWT/session management; platform-guarded storage)
 	├── guards/
