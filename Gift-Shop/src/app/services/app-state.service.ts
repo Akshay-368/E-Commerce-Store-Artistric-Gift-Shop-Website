@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
 export interface ProductItem {
@@ -31,6 +32,9 @@ export interface Order {
 
 @Injectable({ providedIn: 'root' })
 export class AppStateService {
+  private readonly STORAGE_KEY = '__order_bag';
+  private isBrowser: boolean;
+
   private products: ProductItem[] = [
     { id: 'p1', title: 'Minimalist Leather Wallet', price: '₹2,499', priceNum: 2499, category: 'Accessories', image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=1000&auto=format&fit=crop', description: 'A hand-stitched bifold leather wallet crafted from full-grain vegetable-tanned leather.' },
     { id: 'p2', title: 'Handwoven Keychain', price: '₹499', priceNum: 499, category: 'Accessories', image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=1000&auto=format&fit=crop', description: 'A beautifully handwoven keychain made from premium cotton threads in earthy tones.' },
@@ -45,8 +49,8 @@ export class AppStateService {
   private selectedProductSubject = new BehaviorSubject<ProductItem | null>(null);
   selectedProduct$ = this.selectedProductSubject.asObservable();
 
-  private cartSubject = new BehaviorSubject<CartItem[]>([]);
-  cart$ = this.cartSubject.asObservable();
+  private cartSubject!: BehaviorSubject<CartItem[]>;
+  cart$ = null as unknown as import('rxjs').Observable<CartItem[]>;
 
   private cartOpenSubject = new BehaviorSubject<boolean>(false);
   cartOpen$ = this.cartOpenSubject.asObservable();
@@ -58,6 +62,33 @@ export class AppStateService {
 
   getProducts() { return this.products.slice(); }
 
+  constructor(@Inject(PLATFORM_ID) private platformId: Object) {
+    this.isBrowser = isPlatformBrowser(this.platformId);
+    const initialCart = this.loadFromStorage();
+    this.cartSubject = new BehaviorSubject<CartItem[]>(initialCart);
+    this.cart$ = this.cartSubject.asObservable();
+  }
+
+  private loadFromStorage(): CartItem[] {
+    if (!this.isBrowser) return [];
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error('Error reading cart from storage', e);
+      return [];
+    }
+  }
+
+  private saveToStorage(cart: CartItem[]) {
+    if (!this.isBrowser) return;
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(cart));
+    } catch (e) {
+      console.error('Error writing cart to storage', e);
+    }
+  }
+
   openProduct(p: ProductItem) { this.selectedProductSubject.next(p); }
   closeProduct() { this.selectedProductSubject.next(null); }
 
@@ -66,6 +97,7 @@ export class AppStateService {
     const idx = cart.findIndex(c => c.product.id === product.id);
     if (idx >= 0) cart[idx].quantity += qty; else cart.push({ product, quantity: qty });
     this.cartSubject.next(cart);
+    this.saveToStorage(cart);
     this.cartOpenSubject.next(true);
     this.selectedProductSubject.next(null);
   }
@@ -73,9 +105,15 @@ export class AppStateService {
   removeFromCart(productId: string) {
     const cart = this.cartSubject.value.filter(c => c.product.id !== productId);
     this.cartSubject.next(cart);
+    this.saveToStorage(cart);
   }
 
-  clearCart() { this.cartSubject.next([]); }
+  clearCart() {
+    this.cartSubject.next([]);
+    if (this.isBrowser) {
+      try { localStorage.removeItem(this.STORAGE_KEY); } catch (e) { /* ignore */ }
+    }
+  }
 
   openCart() { this.cartOpenSubject.next(true); }
   hideCart() { this.cartOpenSubject.next(false); }
