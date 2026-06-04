@@ -1,0 +1,12 @@
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.AssemblyInfoInputs.cache
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.AssemblyInfo.cs
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.csproj.CoreCompileInputs.cache
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.sourcelink.json
+C:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\bin\Debug\net10.0\GiftShop.Domain.deps.json
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\bin\Debug\net10.0\GiftShop.Domain.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\bin\Debug\net10.0\GiftShop.Domain.pdb
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\refint\GiftShop.Domain.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.pdb
+C:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\ref\GiftShop.Domain.dll

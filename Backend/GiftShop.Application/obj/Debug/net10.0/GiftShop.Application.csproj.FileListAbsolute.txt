@@ -1,0 +1,16 @@
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.csproj.AssemblyReference.cache
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.AssemblyInfoInputs.cache
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.AssemblyInfo.cs
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.csproj.CoreCompileInputs.cache
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.sourcelink.json
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\bin\Debug\net10.0\GiftShop.Application.deps.json
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\bin\Debug\net10.0\GiftShop.Application.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\bin\Debug\net10.0\GiftShop.Application.pdb
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\bin\Debug\net10.0\GiftShop.Domain.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\bin\Debug\net10.0\GiftShop.Domain.pdb
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.6C011E7B.Up2Date
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\refint\GiftShop.Application.dll
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\GiftShop.Application.pdb
+c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Application\obj\Debug\net10.0\ref\GiftShop.Application.dll

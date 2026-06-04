@@ -1,0 +1,250 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using GiftShop.Domain.Common;
+using GiftShop.Domain.Enums;
+
+namespace GiftShop.Domain.Entities;
+
+public sealed class Category : EntityBase
+{
+    [MaxLength(120)]
+    public string Name { get; set; } = string.Empty;
+
+    [MaxLength(160)]
+    public string Slug { get; set; } = string.Empty;
+
+    [MaxLength(240)]
+    public string? Description { get; set; }
+
+    public bool IsActive { get; set; } = true;
+
+    public ICollection<Product> Products { get; set; } = new List<Product>();
+}
+
+public sealed class Product : EntityBase
+{
+    [MaxLength(160)]
+    public string Title { get; set; } = string.Empty;
+
+    [MaxLength(180)]
+    public string Slug { get; set; } = string.Empty;
+
+    [MaxLength(1000)]
+    public string Description { get; set; } = string.Empty;
+
+    public decimal Price { get; set; }
+
+    [MaxLength(120)]
+    public string? ShortDescription { get; set; }
+
+    public bool IsActive { get; set; } = true;
+
+    public int SortOrder { get; set; }
+
+    public Guid CategoryId { get; set; }
+
+    public Category? Category { get; set; }
+
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
+
+    public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
+}
+
+public sealed class ProductImage : EntityBase
+{
+    public Guid ProductId { get; set; }
+
+    public Product? Product { get; set; }
+
+    [MaxLength(600)]
+    public string ImageUrl { get; set; } = string.Empty;
+
+    [MaxLength(240)]
+    public string? PublicId { get; set; }
+
+    [MaxLength(200)]
+    public string? AltText { get; set; }
+
+    public bool IsPrimary { get; set; }
+
+    public int SortOrder { get; set; }
+}
+
+public sealed class Order : EntityBase
+{
+    [MaxLength(40)]
+    public string PublicOrderNumber { get; set; } = string.Empty;
+
+    [MaxLength(180)]
+    public string CustomerName { get; set; } = string.Empty;
+
+    [MaxLength(50)]
+    public string CustomerPhone { get; set; } = string.Empty;
+
+    [MaxLength(500)]
+    public string CustomerAddress { get; set; } = string.Empty;
+
+    public OrderStatus Status { get; set; } = OrderStatus.PendingPayment;
+
+    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
+
+    public decimal Subtotal { get; set; }
+
+    public decimal ShippingFee { get; set; }
+
+    public decimal TotalAmount { get; set; }
+
+    public DateTimeOffset? PaidAt { get; set; }
+
+    public DateTimeOffset? DeliveredAt { get; set; }
+
+    public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
+
+    public ICollection<OrderMessage> Messages { get; set; } = new List<OrderMessage>();
+
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
+}
+
+public sealed class OrderItem : EntityBase
+{
+    public Guid OrderId { get; set; }
+
+    public Order? Order { get; set; }
+
+    public Guid ProductId { get; set; }
+
+    public Product? Product { get; set; }
+
+    [MaxLength(160)]
+    public string TitleSnapshot { get; set; } = string.Empty;
+
+    public decimal PriceSnapshot { get; set; }
+
+    public int Quantity { get; set; }
+}
+
+public sealed class OrderMessage : EntityBase
+{
+    public Guid OrderId { get; set; }
+
+    public Order? Order { get; set; }
+
+    [MaxLength(40)]
+    public string Sender { get; set; } = string.Empty;
+
+    [MaxLength(1000)]
+    public string MessageText { get; set; } = string.Empty;
+}
+
+public sealed class Review : EntityBase
+{
+    public Guid ProductId { get; set; }
+
+    public Product? Product { get; set; }
+
+    public Guid OrderId { get; set; }
+
+    public Order? Order { get; set; }
+
+    [Range(1, 5)]
+    public int Rating { get; set; }
+
+    [MaxLength(1200)]
+    public string? ReviewComment { get; set; }
+
+    public bool IsAnonymous { get; set; }
+
+    public bool IsApproved { get; set; }
+
+    public DateTimeOffset? ApprovedAt { get; set; }
+}
+
+public sealed class AdminUser : EntityBase
+{
+    [MaxLength(120)]
+    public string UserName { get; set; } = string.Empty;
+
+    [MaxLength(255)]
+    public string PasswordHash { get; set; } = string.Empty;
+
+    [MaxLength(80)]
+    public string Role { get; set; } = "SuperAdmin";
+
+    [MaxLength(180)]
+    public string? DisplayName { get; set; }
+
+    public bool IsActive { get; set; } = true;
+
+    public DateTimeOffset? LastLoginAt { get; set; }
+}
+
+public sealed class SiteContentItem : EntityBase
+{
+    [MaxLength(120)]
+    public string ContentKey { get; set; } = string.Empty;
+
+    [MaxLength(120)]
+    public string SectionName { get; set; } = string.Empty;
+
+    public SiteContentItemKind Kind { get; set; }
+
+    [MaxLength(600)]
+    public string? TextValue { get; set; }
+
+    public byte[]? BinaryValue { get; set; }
+
+    [MaxLength(100)]
+    public string? MimeType { get; set; }
+
+    [MaxLength(200)]
+    public string? DisplayLocation { get; set; }
+
+    [MaxLength(200)]
+    public string? AltText { get; set; }
+
+    public int SortOrder { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class AdminAccessBan : EntityBase
+{
+    [MaxLength(45)]
+    public string IpAddress { get; set; } = string.Empty;
+
+    public int FailedAttempts { get; set; }
+
+    public DateTimeOffset? LastAttemptAt { get; set; }
+
+    public DateTimeOffset? BanUntilUtc { get; set; }
+
+    [MaxLength(240)]
+    public string? Reason { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class SystemAuditLog : EntityBase
+{
+    [MaxLength(120)]
+    public string TableName { get; set; } = string.Empty;
+
+    public AuditActionType ActionType { get; set; }
+
+    public DateTimeOffset ActionDate { get; set; } = DateTimeOffset.UtcNow;
+
+    public long? RecordId { get; set; }
+
+    public Guid? UserId { get; set; }
+
+    [MaxLength(4000)]
+    public string? OldValue { get; set; }
+
+    [MaxLength(4000)]
+    public string? NewValue { get; set; }
+
+    [MaxLength(240)]
+    public string? UserName { get; set; }
+}
