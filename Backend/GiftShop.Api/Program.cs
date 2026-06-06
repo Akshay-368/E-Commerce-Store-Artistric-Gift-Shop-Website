@@ -105,11 +105,20 @@ app.MapGet("/healthz", () => Results.Ok(new
 }));
 
 // ── Middleware pipeline ──────────────────────────────────────────────────
+// Configure pipeline
 if (app.Environment.IsDevelopment())
-    app.MapOpenApi();
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+// Health check endpoint for this service
+app.MapGet("/isrunning" , () => "Backend service for gift shop is running. " );
+
 
 app.UseCors("GiftShopPolicy");
 app.UseHttpsRedirection();
+app.UseTimeLogging(); // Custom middleware to log request processing time
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
