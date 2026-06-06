@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using GiftShop.Api.Options;
+using GiftShop.Infrastructure.Options;
 using GiftShop.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

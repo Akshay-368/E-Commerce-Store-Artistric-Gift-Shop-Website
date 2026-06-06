@@ -1,4 +1,4 @@
-namespace GiftShop.Api.Options;
+namespace GiftShop.Infrastructure.Options;
 
 public sealed class AdminSettingsOptions
 {

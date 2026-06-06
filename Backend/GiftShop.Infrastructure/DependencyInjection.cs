@@ -1,5 +1,8 @@
+using GiftShop.Infrastructure.Options;
 using GiftShop.Infrastructure.Persistence;
+using GiftShop.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +22,15 @@ public static class DependencyInjection
                 npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
             });
         });
+
+        // In-memory cache (used by ProductCacheService)
+        services.AddMemoryCache();
+
+        // Cloudinary (reads from IOptions<CloudinarySettingsOptions>)
+        services.AddScoped<ICloudinaryService, CloudinaryService>();
+
+        // Product RAM cache — singleton so the warmed data lives for the app lifetime
+        services.AddSingleton<IProductCacheService, ProductCacheService>();
 
         return services;
     }

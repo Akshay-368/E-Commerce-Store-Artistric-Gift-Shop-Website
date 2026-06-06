@@ -913,6 +913,8 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
         "dependencies": {
+          "CloudinaryDotNet": "1.26.2",
+          "DotNetEnv": "3.1.1",
           "GiftShop.Application": "1.0.0",
           "GiftShop.Domain": "1.0.0",
           "Microsoft.EntityFrameworkCore": "10.0.5",

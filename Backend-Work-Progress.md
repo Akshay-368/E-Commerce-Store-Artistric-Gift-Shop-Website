@@ -380,3 +380,11 @@ And the connection string for the project to use to connect to db is
     "DefaultConnection": "Host=localhost;Port=5432;Database=giftshop;Username=postgres;Password=root;"
 }
 ```
+
+# Date : June 6 , 2026
+## Even though above planned design and architecture has not been fully implemented yet, but an update is needed as well
+NG02801: Angular detected that `HttpClient` is not configured to use `fetch` APIs. It's strongly recommended to enable `fetch` for applications that use Server-Side Rendering for better performance and compatibility. To enable `fetch`, add the `withFetch()` to the `provideHttpClient()` call at the root of the application.
+(node:7816) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+And also there is a need for updating the admin dashboard to actually start updating (the content of the website , all the sections of the landing page) and also being able to do  addition  , removal , updating, reading of products by the admin which should then get fetched by the user's page and the content should be added and updated in db ( and ofcourse cloudinary as well).

@@ -1,19 +1,35 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { AppStateService, ProductItem } from '../services/app-state.service';
+import { Component, OnInit } from '@angular/core';
+import { AppStateService, ProductItem, SiteContentItem } from '../services/app-state.service';
 import { ProductCardComponent } from './product-card.component';
+import { SectionSlideshowComponent } from './section-slideshow.component';
+
+const API_BASE = 'http://localhost:5000';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, ProductCardComponent],
+  imports: [CommonModule, ProductCardComponent, SectionSlideshowComponent],
   template: `
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SECTION 1 — HERO (full-viewport with DB-driven slideshow)
+    ══════════════════════════════════════════════════════════════════════ -->
     <section class="hero" id="hero">
-      <div class="hero-bg"></div>
+      <!-- Slideshow background — if no DB images, falls back to Unsplash -->
+      <div class="hero-bg">
+        <app-section-slideshow
+          *ngIf="heroImages.length > 0"
+          [images]="heroImages"
+          [interval]="6000">
+        </app-section-slideshow>
+        <!-- Static fallback while images load or if none in DB yet -->
+        <div class="hero-bg-fallback" *ngIf="heroImages.length === 0"></div>
+      </div>
+      <div class="hero-overlay"></div>
       <div class="hero-content">
         <div class="hero-badge">✨ New arrivals every week</div>
-        <h1>Welcome to <em>Kalakaari Gifting</em></h1>
-        <p>Discover the Charm of Handmade Art at Your Doorstep — thoughtfully crafted, beautifully wrapped, and designed to turn ordinary days into unforgettable celebrations.</p>
+        <h1>{{ heroHeading || 'Welcome to' }} <em>{{ heroSubheading || 'Kalakaari Gifting' }}</em></h1>
+        <p>{{ heroCopy || 'Discover the Charm of Handmade Art at Your Doorstep — thoughtfully crafted, beautifully wrapped, and designed to turn ordinary days into unforgettable celebrations.' }}</p>
         <div class="hero-cta-row">
           <button type="button" class="btn-hero-primary" (click)="scrollTo('catalog')">Explore the Gift Collection</button>
           <button type="button" class="btn-hero-ghost" (click)="scrollTo('manifesto')">Discover Our Story</button>
@@ -22,26 +38,41 @@ import { ProductCardComponent } from './product-card.component';
       <div class="hero-scroll">Scroll</div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SECTION 2 — MANIFESTO
+    ══════════════════════════════════════════════════════════════════════ -->
     <section class="manifesto" id="manifesto">
       <div class="manifesto-inner">
         <div class="section-eyebrow">Our Philosophy</div>
         <blockquote>
-          We believe that a gift shouldn't just be an object; it should be a tangible reflection of a connection. Every artistic piece in our boutique is hand-selected and crafted in limited numbers, ensuring that whatever you choose to share is as unique and wonderful as the person receiving it.
+          {{ manifestoQuote || 'We believe that a gift shouldn\'t just be an object; it should be a tangible reflection of a connection. Every artistic piece in our boutique is hand-selected and crafted in limited numbers, ensuring that whatever you choose to share is as unique and wonderful as the person receiving it.' }}
         </blockquote>
         <p class="manifesto-sig">Kalakaari Gifting — Where creativity becomes a gift</p>
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SECTION 3 — FEATURE ALPHA (Left text, Right image slideshow)
+    ══════════════════════════════════════════════════════════════════════ -->
     <section class="feature-section" id="feature-1">
       <div class="container">
         <div class="feature-grid">
           <div class="feature-img-wrap">
-            <img src="/assets/handcrafted-i-love-u-chocolate-bar.jpeg" alt="Crafted by hand" />
+            <app-section-slideshow
+              *ngIf="feature1Images.length > 0"
+              [images]="feature1Images"
+              [interval]="5500">
+            </app-section-slideshow>
+            <!-- Fallback static image -->
+            <img
+              *ngIf="feature1Images.length === 0"
+              src="/assets/handcrafted-i-love-u-chocolate-bar.jpeg"
+              alt="Crafted by hand" />
           </div>
           <div class="feature-text">
             <div class="section-eyebrow eyebrow-left">The Artist's Touch</div>
             <h2>Crafted by<br />Real Hands</h2>
-            <p>Unlike mass-produced store items, our fancy gift collections are born from local studio sessions. From initial sketch to final polish, each item carries distinct artistic character and absolute material perfection.</p>
+            <p>{{ feature1Para1 || 'Unlike mass-produced store items, our fancy gift collections are born from local studio sessions. From initial sketch to final polish, each item carries distinct artistic character and absolute material perfection.' }}</p>
             <p>Every piece tells a story — of patience, skill, and genuine care for the person who will eventually receive it.</p>
             <div class="feature-detail">
               <span class="feature-detail-icon">🎨</span>
@@ -52,16 +83,27 @@ import { ProductCardComponent } from './product-card.component';
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SECTION 4 — FEATURE BETA (Right text, Left image slideshow)
+    ══════════════════════════════════════════════════════════════════════ -->
     <section class="feature-section alt" id="feature-2">
       <div class="container">
         <div class="feature-grid reverse">
           <div class="feature-img-wrap">
-            <img src="https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop" alt="Unboxing experience" />
+            <app-section-slideshow
+              *ngIf="feature2Images.length > 0"
+              [images]="feature2Images"
+              [interval]="5000">
+            </app-section-slideshow>
+            <img
+              *ngIf="feature2Images.length === 0"
+              src="https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop"
+              alt="Unboxing experience" />
           </div>
           <div class="feature-text">
             <div class="section-eyebrow eyebrow-left">The Art of Giving</div>
             <h2>Unboxing<br />an Experience</h2>
-            <p>Presentation is half the magic of a thoughtful surprise. Every order is meticulously packaged in our signature keepsake boxing with a blank or custom-written message card, ready to delight them the exact second it arrives.</p>
+            <p>{{ feature2Para1 || 'Presentation is half the magic of a thoughtful surprise. Every order is meticulously packaged in our signature keepsake boxing with a blank or custom-written message card, ready to delight them the exact second it arrives.' }}</p>
             <p>We believe the unwrapping moment is part of the gift itself — which is why we pour as much love into the packaging as the product inside.</p>
             <div class="feature-detail">
               <span class="feature-detail-icon">🎀</span>
@@ -72,6 +114,9 @@ import { ProductCardComponent } from './product-card.component';
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SECTION 5 — HIGHLIGHTS CLOUD
+    ══════════════════════════════════════════════════════════════════════ -->
     <section class="highlights" id="highlights">
       <div class="container">
         <div class="highlights-header">
@@ -103,6 +148,9 @@ import { ProductCardComponent } from './product-card.component';
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         SECTION 6 — CATALOG GRID
+    ══════════════════════════════════════════════════════════════════════ -->
     <section class="catalog" id="catalog">
       <div class="container">
         <div class="catalog-header">
@@ -114,21 +162,29 @@ import { ProductCardComponent } from './product-card.component';
           <div class="catalog-controls">
             <div class="search-wrap">
               <span class="search-icon">🔍</span>
-              <input type="text" placeholder="Search products..." [value]="searchQuery" (input)="onSearch($any($event.target).value)" />
+              <input type="text" placeholder="Search products..."
+                [value]="searchQuery"
+                (input)="onSearch($any($event.target).value)" />
             </div>
-            <select class="filter-select" [value]="selectedCategory" (change)="onFilter($any($event.target).value)">
+            <select class="filter-select"
+              [value]="selectedCategory"
+              (change)="onFilter($any($event.target).value)">
               <option value="">All Categories</option>
-              <option value="Accessories">Accessories</option>
-              <option value="Home Decor">Home Decor</option>
-              <option value="Kitchen">Kitchen</option>
-              <option value="Stationery">Stationery</option>
-              <option value="Jewellery">Jewellery</option>
+              <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
             </select>
           </div>
         </div>
 
         <div class="product-grid">
-          <app-product-card *ngFor="let product of visibleProducts; trackBy: trackById" [product]="product"></app-product-card>
+          <app-product-card
+            *ngFor="let product of visibleProducts; trackBy: trackById"
+            [product]="product">
+          </app-product-card>
+        </div>
+
+        <div class="empty-state" *ngIf="visibleProducts.length === 0">
+          <div class="empty-icon">🎁</div>
+          <p>No products found matching your search.</p>
         </div>
 
         <div class="load-more-row" *ngIf="hasMore">
@@ -137,6 +193,9 @@ import { ProductCardComponent } from './product-card.component';
       </div>
     </section>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         FOOTER
+    ══════════════════════════════════════════════════════════════════════ -->
     <footer class="site-footer">
       <div class="container">
         <div class="footer-inner">
@@ -156,12 +215,15 @@ import { ProductCardComponent } from './product-card.component';
       </div>
     </footer>
   `,
-  styles: [
-    `:host{display:block}
+  styles: [`
+    :host{display:block}
+
+    /* ── Hero ─────────────────────────────────────────────────────────── */
     .hero{position:relative;min-height:90vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .hero-bg{position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop');background-size:cover;background-position:center}
-    .hero-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(10,20,5,0.62) 0%,rgba(10,30,5,0.48) 50%,rgba(136,173,53,0.25) 100%)}
-    .hero-content{position:relative;z-index:1;text-align:center;max-width:780px;padding:2rem 1.5rem}
+    .hero-bg{position:absolute;inset:0}
+    .hero-bg-fallback{position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop');background-size:cover;background-position:center}
+    .hero-overlay{position:absolute;inset:0;background:linear-gradient(160deg,rgba(10,20,5,0.62) 0%,rgba(10,30,5,0.48) 50%,rgba(136,173,53,0.25) 100%);z-index:1;pointer-events:none}
+    .hero-content{position:relative;z-index:2;text-align:center;max-width:780px;padding:2rem 1.5rem}
     .hero-badge{display:inline-flex;align-items:center;gap:0.5rem;background:rgba(236,244,211,0.18);border:1px solid rgba(236,244,211,0.4);backdrop-filter:blur(6px);color:var(--color-sage);padding:0.35rem 1rem;border-radius:50px;font-size:0.78rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:1.5rem}
     .hero-content h1{font-family:var(--font-display);font-size:clamp(2.4rem,5.5vw,4rem);font-weight:700;color:#fff;line-height:1.15;letter-spacing:-0.02em;margin-bottom:1.25rem}
     .hero-content h1 em{font-style:italic;color:var(--color-sage-m)}
@@ -172,8 +234,10 @@ import { ProductCardComponent } from './product-card.component';
     .btn-hero-primary:hover{background:var(--color-primary-d);transform:translateY(-2px);box-shadow:0 8px 28px rgba(136,173,53,0.55)}
     .btn-hero-ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,0.65);padding:0.85rem 2.2rem;border-radius:50px;font-size:1rem;font-weight:500;transition:var(--transition);backdrop-filter:blur(4px)}
     .btn-hero-ghost:hover{background:rgba(255,255,255,0.12);border-color:#fff}
-    .hero-scroll{position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);z-index:1;display:flex;flex-direction:column;align-items:center;gap:0.4rem;color:rgba(255,255,255,0.6);font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;animation:bounce 2s infinite}
+    .hero-scroll{position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:0.4rem;color:rgba(255,255,255,0.6);font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;animation:bounce 2s infinite}
     .hero-scroll::after{content:'↓';font-size:1.1rem}
+
+    /* ── Manifesto ────────────────────────────────────────────────────── */
     .manifesto{background:var(--color-sage);padding:5rem 0}
     .manifesto-inner{max-width:860px;margin:0 auto;text-align:center;padding:0 2rem}
     .section-eyebrow{font-size:0.78rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-primary);margin-bottom:1.2rem;display:flex;align-items:center;justify-content:center;gap:0.6rem}
@@ -182,9 +246,11 @@ import { ProductCardComponent } from './product-card.component';
     .eyebrow-left::before{display:none}
     .eyebrow-left::after{max-width:36px}
     .manifesto blockquote{font-family:var(--font-display);font-size:clamp(1.2rem,2.4vw,1.65rem);font-style:italic;color:var(--color-charcoal);line-height:1.65;position:relative;padding:0 3rem}
-    .manifesto blockquote::before{content:'“';font-size:7rem;line-height:0.7;color:var(--color-primary);opacity:0.3;position:absolute;top:0.4rem;left:0;font-style:normal}
+    .manifesto blockquote::before{content:'"';font-size:7rem;line-height:0.7;color:var(--color-primary);opacity:0.3;position:absolute;top:0.4rem;left:0;font-style:normal}
     .manifesto-sig{margin-top:2rem;font-size:0.9rem;color:var(--color-body);font-weight:500;display:flex;align-items:center;justify-content:center;gap:0.5rem}
     .manifesto-sig::before{content:'—'}
+
+    /* ── Feature sections ─────────────────────────────────────────────── */
     .feature-section{padding:5.5rem 0;background:#fff}
     .feature-section.alt{background:var(--color-bg)}
     .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center}
@@ -193,12 +259,14 @@ import { ProductCardComponent } from './product-card.component';
     .feature-img-wrap{position:relative;border-radius:var(--radius);overflow:hidden;aspect-ratio:4/5;box-shadow:var(--shadow-lift)}
     .feature-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease}
     .feature-img-wrap:hover img{transform:scale(1.04)}
-    .feature-img-wrap::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(34,34,34,0.15),transparent 60%);pointer-events:none}
+    .feature-img-wrap::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(34,34,34,0.15),transparent 60%);pointer-events:none;z-index:5}
     .feature-text{padding:1rem 0}
     .feature-text h2{font-family:var(--font-display);font-size:clamp(1.8rem,3.2vw,2.6rem);font-weight:700;color:var(--color-charcoal);line-height:1.2;margin-bottom:1.25rem;letter-spacing:-0.02em}
     .feature-text p{font-size:1.05rem;line-height:1.75;color:var(--color-body);margin-bottom:1.5rem}
     .feature-detail{display:flex;align-items:center;gap:0.8rem;background:var(--color-sage);border-radius:12px;padding:0.9rem 1.2rem;font-size:0.9rem;color:var(--color-charcoal);font-weight:500}
     .feature-detail-icon{font-size:1.4rem;flex-shrink:0}
+
+    /* ── Highlights ───────────────────────────────────────────────────── */
     .highlights{background:var(--color-sage);padding:5rem 0}
     .highlights-header{text-align:center;margin-bottom:3.5rem}
     .highlights-header h2{font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.4rem);color:var(--color-charcoal);font-weight:700}
@@ -212,6 +280,8 @@ import { ProductCardComponent } from './product-card.component';
     .highlight-card:nth-child(4) .highlight-icon-wrap{background:rgba(105,137,39,0.12);color:var(--color-primary-d)}
     .highlight-card h4{font-family:var(--font-ui);font-size:1rem;font-weight:600;color:var(--color-charcoal);margin-bottom:0.4rem}
     .highlight-card p{font-size:0.88rem;color:var(--color-body);line-height:1.5}
+
+    /* ── Catalog ──────────────────────────────────────────────────────── */
     .catalog{padding:5.5rem 0;background:#fff}
     .catalog-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2.5rem;gap:1.5rem;flex-wrap:wrap}
     .catalog-title-group h2{font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.4rem);color:var(--color-charcoal);font-weight:700;line-height:1.2}
@@ -227,6 +297,10 @@ import { ProductCardComponent } from './product-card.component';
     .load-more-row{text-align:center;margin-top:3.5rem}
     .btn-load-more{background:transparent;border:2px solid var(--color-primary);color:var(--color-primary);padding:0.85rem 2.8rem;border-radius:50px;font-size:0.95rem;font-weight:600;transition:var(--transition)}
     .btn-load-more:hover{background:var(--color-primary);color:#fff}
+    .empty-state{text-align:center;padding:4rem 0;color:var(--color-body)}
+    .empty-icon{font-size:3rem;margin-bottom:1rem}
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
     .site-footer{background:var(--color-charcoal);color:rgba(255,255,255,0.7);padding:3rem 0 2rem}
     .footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem}
     .footer-brand{display:flex;align-items:center;gap:0.75rem}
@@ -237,60 +311,108 @@ import { ProductCardComponent } from './product-card.component';
     .footer-links{display:flex;gap:1.5rem;font-size:0.83rem}
     .footer-links a{transition:var(--transition)}
     .footer-links a:hover{color:var(--color-primary)}
+
     @keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
-    @media (max-width:900px){.feature-grid{grid-template-columns:1fr;gap:2.5rem}.feature-grid.reverse{direction:ltr}.feature-img-wrap{aspect-ratio:16/9}.catalog-header{flex-direction:column;align-items:flex-start}}
-    @media (max-width:600px){.container{padding:0 1.25rem}.product-grid{grid-template-columns:1fr 1fr;gap:1rem}.manifesto blockquote{padding:0 1rem}.footer-inner{flex-direction:column;align-items:center;text-align:center}.footer-links{justify-content:center;flex-wrap:wrap}}
-    @media (max-width:420px){.product-grid{grid-template-columns:1fr}.hero-content h1{font-size:2rem}}
-    `
-  ]
+
+    @media (max-width:900px){
+      .feature-grid{grid-template-columns:1fr;gap:2.5rem}
+      .feature-grid.reverse{direction:ltr}
+      .feature-img-wrap{aspect-ratio:16/9}
+      .catalog-header{flex-direction:column;align-items:flex-start}
+    }
+    @media (max-width:600px){
+      .container{padding:0 1.25rem}
+      .product-grid{grid-template-columns:1fr 1fr;gap:1rem}
+      .manifesto blockquote{padding:0 1rem}
+      .footer-inner{flex-direction:column;align-items:center;text-align:center}
+      .footer-links{justify-content:center;flex-wrap:wrap}
+    }
+    @media (max-width:420px){
+      .product-grid{grid-template-columns:1fr}
+      .hero-content h1{font-size:2rem}
+    }
+  `]
 })
-export class HomeComponent {
-  private products: ProductItem[] = [];
+export class HomeComponent implements OnInit {
+  private allProducts: ProductItem[] = [];
+
   searchQuery = '';
   selectedCategory = '';
   displayedCount = 6;
+  categories: string[] = [];
 
-  constructor(private state: AppStateService) {
-    this.products = this.state.getProducts();
+  // ── Section image URLs (from DB binary, served via /api/content/{id}/image)
+  heroImages: string[] = [];
+  feature1Images: string[] = [];
+  feature2Images: string[] = [];
+
+  // ── Section text (from DB or fallback defaults inline)
+  heroHeading: string | null = null;
+  heroSubheading: string | null = null;
+  heroCopy: string | null = null;
+  manifestoQuote: string | null = null;
+  feature1Para1: string | null = null;
+  feature2Para1: string | null = null;
+
+  constructor(private state: AppStateService) {}
+
+  ngOnInit(): void {
+    // Subscribe to products (live-updating when API loads)
+    this.state.products$.subscribe(products => {
+      this.allProducts = products;
+      this.categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+    });
+
+    // Subscribe to site content (section images + text)
+    this.state.siteContent$.subscribe(items => {
+      this.heroImages = this.buildImageUrls(items, 'hero');
+      this.feature1Images = this.buildImageUrls(items, 'feature-1');
+      this.feature2Images = this.buildImageUrls(items, 'feature-2');
+
+      this.heroHeading      = this.getTextValue(items, 'hero.heading');
+      this.heroSubheading   = this.getTextValue(items, 'hero.subheading');
+      this.heroCopy         = this.getTextValue(items, 'hero.copy');
+      this.manifestoQuote   = this.getTextValue(items, 'manifesto.quote');
+      this.feature1Para1    = this.getTextValue(items, 'feature-1.para1');
+      this.feature2Para1    = this.getTextValue(items, 'feature-2.para1');
+    });
+  }
+
+  private buildImageUrls(items: SiteContentItem[], section: string): string[] {
+    return items
+      .filter(i => i.sectionName === section && i.kind === 'Image' && i.imageUrl)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(i => `http://localhost:5000${i.imageUrl}`);
+  }
+
+  private getTextValue(items: SiteContentItem[], key: string): string | null {
+    return items.find(i => i.contentKey === key && i.kind === 'Text')?.textValue ?? null;
+  }
+
+  // ── Catalog logic ──────────────────────────────────────────────────────
+  get filteredProducts(): ProductItem[] {
+    const q = this.searchQuery.trim().toLowerCase();
+    return this.allProducts.filter(p => {
+      const matchesQuery = !q ||
+        p.title.toLowerCase().includes(q) ||
+        (p.description ?? '').toLowerCase().includes(q) ||
+        (p.category ?? '').toLowerCase().includes(q);
+      const matchesCat = !this.selectedCategory || p.category === this.selectedCategory;
+      return matchesQuery && matchesCat;
+    });
   }
 
   get visibleProducts(): ProductItem[] {
-    const query = this.searchQuery.trim().toLowerCase();
-    return this.products.filter((product) => {
-      const matchesQuery = !query || product.title.toLowerCase().includes(query) || (product.description ?? '').toLowerCase().includes(query);
-      const matchesCategory = !this.selectedCategory || product.category === this.selectedCategory;
-      return matchesQuery && matchesCategory;
-    }).slice(0, this.displayedCount);
+    return this.filteredProducts.slice(0, this.displayedCount);
   }
 
   get hasMore(): boolean {
-    const query = this.searchQuery.trim().toLowerCase();
-    return this.products.filter((product) => {
-      const matchesQuery = !query || product.title.toLowerCase().includes(query) || (product.description ?? '').toLowerCase().includes(query);
-      const matchesCategory = !this.selectedCategory || product.category === this.selectedCategory;
-      return matchesQuery && matchesCategory;
-    }).length > this.displayedCount;
+    return this.filteredProducts.length > this.displayedCount;
   }
 
-  onSearch(value: string): void {
-    this.searchQuery = value;
-    this.displayedCount = 6;
-  }
-
-  onFilter(value: string): void {
-    this.selectedCategory = value;
-    this.displayedCount = 6;
-  }
-
-  loadMore(): void {
-    this.displayedCount += 4;
-  }
-
-  trackById(_: number, product: ProductItem): string {
-    return product.id;
-  }
-
-  scrollTo(sectionId: string): void {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
-  }
+  onSearch(value: string): void { this.searchQuery = value; this.displayedCount = 6; }
+  onFilter(value: string): void { this.selectedCategory = value; this.displayedCount = 6; }
+  loadMore(): void { this.displayedCount += 4; }
+  trackById(_: number, p: ProductItem): string { return p.id; }
+  scrollTo(id: string): void { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
 }

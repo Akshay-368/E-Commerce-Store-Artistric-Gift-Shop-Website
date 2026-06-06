@@ -1,70 +1,183 @@
+using System.Text;
 using GiftShop.Api.Configuration;
-using GiftShop.Api.Options;
+using GiftShop.Api.Middleware;
+using GiftShop.Infrastructure.Options;
 using GiftShop.Infrastructure;
 using GiftShop.Infrastructure.Persistence;
+using GiftShop.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.RateLimiting;
 
+// ── Load .env file (dev convenience; in prod, env vars take precedence) ─
 DotEnvLoader.Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Configuration sources (env vars override appsettings.json) ──────────
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
+// ── Services ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
-builder.Services.AddInfrastructure(builder.Configuration);
+
+// Options
 builder.Services.Configure<AdminSettingsOptions>(builder.Configuration.GetSection(AdminSettingsOptions.SectionName));
-builder.Services.PostConfigure<AdminSettingsOptions>(options => options.Normalize());
+builder.Services.PostConfigure<AdminSettingsOptions>(o => o.Normalize());
+builder.Services.Configure<CloudinarySettingsOptions>(builder.Configuration.GetSection(CloudinarySettingsOptions.SectionName));
+builder.Services.Configure<JwtSettingsOptions>(builder.Configuration.GetSection(JwtSettingsOptions.SectionName));
+
+// JSON serialization
 builder.Services.Configure<JsonOptions>(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
-    options.SerializerOptions.WriteIndented = true;
+    options.SerializerOptions.WriteIndented = false;
 });
-builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Infrastructure (DbContext, MemoryCache, Cloudinary, ProductCacheService)
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// CORS — allow Angular dev server and production origin
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("GiftShopPolicy", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:4200",
+                "https://localhost:4200",
+                "https://giftshop.vercel.app") // replace with real prod URL
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
+// JWT Authentication
+var jwtSection = builder.Configuration.GetSection(JwtSettingsOptions.SectionName);
+var jwtSecret = jwtSection["SecretKey"] ?? "giftshop-dev-secret-key-min-32-chars!";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"] ?? "GiftShop.Api",
+            ValidAudience = jwtSection["Audience"] ?? "GiftShop.Admin",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// Rate limiting on /api/admin — using ASP.NET Core native limiter
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("AdminLoginPolicy", limiter =>
+    {
+        limiter.PermitLimit = 5;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+});
+
+// ── Build app ─────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-
+// ── Healthcheck (public, no auth) ────────────────────────────────────────
 app.MapGet("/healthz", () => Results.Ok(new
 {
     status = "ok",
     service = "GiftShop.Api",
     environment = app.Environment.EnvironmentName,
+    timestamp = DateTimeOffset.UtcNow
 }));
 
-// Configure the Http request pipeline ...
+// ── Middleware pipeline ──────────────────────────────────────────────────
+if (app.Environment.IsDevelopment())
+    app.MapOpenApi();
+
+app.UseCors("GiftShopPolicy");
 app.UseHttpsRedirection();
+app.UseRateLimiter();
+app.UseAuthentication();
 app.UseAuthorization();
+
+// ── Admin route branch: IP whitelist + pre-auth key enforcement ──────────
+// This branch catches EVERY request under /api/admin before it reaches controllers.
+// The middleware does: IP whitelist → 24h ban check → cooldown check → pre-auth key.
+app.Map("/api/admin", adminBranch =>
+{
+    adminBranch.UseMiddleware<AdminIpWhitelistMiddleware>();
+
+    // Hand off to the main controller pipeline after middleware passes
+    adminBranch.Run(async context =>
+    {
+        // This terminal handler is never reached for valid requests because
+        // MapControllers() below handles routing globally. We just need the
+        // middleware to fire for the /api/admin prefix.
+        await context.Response.WriteAsJsonAsync(new { error = "Not Found" });
+    });
+});
+
 app.MapControllers();
 
-// Automatically apply migrations on startup
+// ── Database migration + seeding on startup ──────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
-        
-        // This will check the database, find any pending migrations, and run them
         await context.Database.MigrateAsync();
-        
-        Console.WriteLine("Database migrations applied successfully.");
+        Console.WriteLine("[Startup] Database migrations applied.");
+
+        // Seed admin user if none exists
+        if (!await context.AdminUsers.AnyAsync())
+        {
+            var adminOpts = builder.Configuration.GetSection(AdminSettingsOptions.SectionName);
+            var userName = adminOpts["AdminUserName"] ?? "admin";
+            var password = adminOpts["AdminPassword"] ?? "admin@2026";
+
+            context.AdminUsers.Add(new GiftShop.Domain.Entities.AdminUser
+            {
+                UserName = userName,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                Role = "SuperAdmin",
+                DisplayName = "Store Owner",
+                IsActive = true
+            });
+            await context.SaveChangesAsync();
+            Console.WriteLine("[Startup] Default admin user seeded.");
+        }
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating the database.");
-        // Optional: Fail fast and stop the app if the database schema is broken
+        logger.LogError(ex, "[Startup] Database migration/seed failed.");
         throw;
     }
 }
+
+// ── Warm up product RAM cache ─────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var cacheService = scope.ServiceProvider.GetRequiredService<IProductCacheService>();
+    await cacheService.RefreshCacheAsync();
+}
+
+// ── Load active IP bans from DB into memory ───────────────────────────────
+await AdminBanRegistry.WarmUpFromDatabaseAsync(app.Services);
 
 app.Run();
