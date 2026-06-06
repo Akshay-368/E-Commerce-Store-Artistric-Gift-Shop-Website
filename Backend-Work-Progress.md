@@ -388,3 +388,14 @@ NG02801: Angular detected that `HttpClient` is not configured to use `fetch` API
 (Use `node --trace-deprecation ...` to show where the warning was created)
 
 And also there is a need for updating the admin dashboard to actually start updating (the content of the website , all the sections of the landing page) and also being able to do  addition  , removal , updating, reading of products by the admin which should then get fetched by the user's page and the content should be added and updated in db ( and ofcourse cloudinary as well).
+
+Update : Some new content for the above has been added , where home page and products page component .ts files in admin in src folder were updated thoroughly, and many more , though still this kind of issue persists
+***
+what is the secrete preauth admin key and why is it that despite my time logging middleware i am not seeing any request in the backend terminal as i am trying to get into the admin portal , but the key 
+
+```json
+Abcd#1234_XyZ987
+```
+
+keeps on getting rejected and also should not the frontend be sending validation request to backend but i am not seeing anything , is frontend even sending any reuqest at all ? and also why is it that since ( frontend )keeps on showing the key as invaid and i have tried more than 3 times non stop continously but no time delay that was supposed to happen as per the code we write where 3, 8 15 minutes like time was supposed to be added after wrong attempts , did not happen ? why ? 
+***
