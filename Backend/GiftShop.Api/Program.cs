@@ -24,6 +24,8 @@ builder.Configuration
 
 // ── Services ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers();
+// 💡 THIS LINE: This registers ISwaggerProvider and other required services
+builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
