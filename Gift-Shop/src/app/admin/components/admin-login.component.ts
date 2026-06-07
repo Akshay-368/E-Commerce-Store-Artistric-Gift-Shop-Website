@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, OnDestroy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdminAuthService } from '../services/admin-auth.service';
@@ -49,6 +49,14 @@ type Stage = 'preauth' | 'login';
           </div>
         }
 
+        <!-- FIX: Live cooldown countdown banner -->
+        @if (cooldownSecs() > 0) {
+          <div class="login-cooldown">
+            <span>⏳</span>
+            <span>Too many failed attempts. Try again in <strong>{{ formatCooldown(cooldownSecs()) }}</strong></span>
+          </div>
+        }
+
         <!-- ── Stage 1: Pre-auth secret key ── -->
         @if (stage() === 'preauth') {
           <div class="login-form">
@@ -62,7 +70,7 @@ type Stage = 'preauth' | 'login';
                   class="field-input mono"
                   placeholder="••••••••••••••••"
                   [(ngModel)]="secretKey"
-                  [disabled]="loading()"
+                  [disabled]="loading() || cooldownSecs() > 0"
                   (keydown.enter)="doPreAuth()"
                   autocomplete="off"
                   maxlength="32"
@@ -72,8 +80,10 @@ type Stage = 'preauth' | 'login';
                 </button>
               </div>
             </div>
-            <button class="login-btn" (click)="doPreAuth()" [disabled]="loading() || !secretKey">
+            <!-- FIX: Button disabled during cooldown -->
+            <button class="login-btn" (click)="doPreAuth()" [disabled]="loading() || !secretKey || cooldownSecs() > 0">
               @if (loading()) { <span class="spinner"></span> Verifying… }
+              @else if (cooldownSecs() > 0) { ⏳ Wait {{ formatCooldown(cooldownSecs()) }} }
               @else { Verify Key → }
             </button>
           </div>
@@ -137,6 +147,7 @@ type Stage = 'preauth' | 'login';
     .stage-divider { flex: 0; height: 1px; width: 28px; background: rgba(255,255,255,0.08); }
     .login-alert { display: flex; align-items: center; gap: 9px; background: rgba(224,84,84,0.1); border: 1px solid rgba(224,84,84,0.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #e05454; margin-bottom: 16px; }
     .login-success { display: flex; align-items: center; gap: 9px; background: rgba(61,207,142,0.08); border: 1px solid rgba(61,207,142,0.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #3dcf8e; margin-bottom: 16px; }
+    .login-cooldown { display: flex; align-items: center; gap: 9px; background: rgba(255,165,0,0.08); border: 1px solid rgba(255,165,0,0.25); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #ffaa44; margin-bottom: 16px; }
     .login-form { display: flex; flex-direction: column; gap: 16px; }
     .field-group { display: flex; flex-direction: column; gap: 6px; }
     .field-label { font-size: 12.5px; font-weight: 600; color: #888; letter-spacing: 0.3px; }
@@ -157,22 +168,62 @@ type Stage = 'preauth' | 'login';
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
-export class AdminLoginComponent {
+export class AdminLoginComponent implements OnDestroy {
   stage = signal<Stage>('preauth');
   loading = signal(false);
   errorMsg = signal('');
   successMsg = signal('');
   showKey = signal(false);
   showPass = signal(false);
+  // FIX: Reactive signal for live countdown display (in seconds)
+  cooldownSecs = signal(0);
 
   secretKey = '';
   username = '';
   password = '';
 
-  constructor(private authSvc: AdminAuthService, private router: Router) {}
+  // FIX: Interval handle for live countdown ticker
+  private cooldownInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor(private authSvc: AdminAuthService, private router: Router) {
+    // FIX: On component init, check if we're already in a lockout (e.g. after page refresh)
+    this.updateCooldown();
+  }
+
+  ngOnDestroy() {
+    if (this.cooldownInterval) clearInterval(this.cooldownInterval);
+  }
+
+  /** Reads remaining lockout from service and starts a 1-second countdown ticker. */
+  private updateCooldown() {
+    const remaining = this.authSvc.getLockoutRemaining();
+    if (remaining > 0) {
+      this.cooldownSecs.set(Math.ceil(remaining / 1000));
+      if (this.cooldownInterval) clearInterval(this.cooldownInterval);
+      this.cooldownInterval = setInterval(() => {
+        const r = this.authSvc.getLockoutRemaining();
+        const secs = Math.ceil(r / 1000);
+        this.cooldownSecs.set(secs);
+        if (secs <= 0) {
+          clearInterval(this.cooldownInterval!);
+          this.cooldownInterval = null;
+          this.errorMsg.set('');
+        }
+      }, 1000);
+    } else {
+      this.cooldownSecs.set(0);
+    }
+  }
+
+  /** Formats seconds into mm:ss string. */
+  formatCooldown(secs: number): string {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
 
   doPreAuth() {
-    if (!this.secretKey || this.loading()) return;
+    if (!this.secretKey || this.loading() || this.cooldownSecs() > 0) return;
     this.loading.set(true);
     this.errorMsg.set('');
     this.authSvc.verifyPreAuthKey(this.secretKey).subscribe({
@@ -184,9 +235,16 @@ export class AdminLoginComponent {
       error: (err) => {
         this.loading.set(false);
         const status = err?.status;
-        if (status === 403) this.errorMsg.set('Your IP is not whitelisted for admin access.');
-        else if (status === 429) this.errorMsg.set('Too many attempts. Please wait before trying again.');
-        else this.errorMsg.set('Invalid access key. Please check and try again.');
+        if (status === 403) {
+          this.errorMsg.set('Your IP is not whitelisted for admin access.');
+        } else if (status === 429) {
+          // FIX: Start live countdown — service already wrote lockout to localStorage
+          this.updateCooldown();
+          const secs = err?.error?.retryAfterSeconds ?? this.cooldownSecs();
+          this.errorMsg.set(`Too many attempts. Please wait ${this.formatCooldown(secs)}.`);
+        } else {
+          this.errorMsg.set('Invalid access key. Please check and try again.');
+        }
       }
     });
   }

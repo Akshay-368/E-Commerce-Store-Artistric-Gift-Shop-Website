@@ -137,10 +137,13 @@ public sealed class AdminIpWhitelistMiddleware
         if (AdminBanRegistry.IsInCooldown(ip, out var remaining))
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            // FIX: Include retryAfterSeconds in the response body so the Angular
+            // frontend can read it and display an accurate countdown timer.
             await context.Response.WriteAsJsonAsync(new
             {
                 error = "TooManyRequests",
-                message = $"Too many failed attempts. Please wait {(int)remaining.TotalSeconds} seconds before trying again."
+                message = $"Too many failed attempts. Please wait {(int)remaining.TotalSeconds} seconds before trying again.",
+                retryAfterSeconds = (int)Math.Ceiling(remaining.TotalSeconds)
             });
             return;
         }

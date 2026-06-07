@@ -126,6 +126,7 @@ app.UseAuthorization();
 // ── Admin route branch: IP whitelist + pre-auth key enforcement ──────────
 // This branch catches EVERY request under /api/admin before it reaches controllers.
 // The middleware does: IP whitelist → 24h ban check → cooldown check → pre-auth key.
+/*
 app.Map("/api/admin", adminBranch =>
 {
     adminBranch.UseMiddleware<AdminIpWhitelistMiddleware>();
@@ -139,6 +140,17 @@ app.Map("/api/admin", adminBranch =>
         await context.Response.WriteAsJsonAsync(new { error = "Not Found" });
     });
 });
+*/
+// FIX: Use UseWhen() instead of app.Map(...).Run(...).
+// The previous app.Map("/api/admin", branch => { branch.UseMiddleware<>(); branch.Run(...) })
+// pattern created a TERMINAL branch — requests matched the prefix, ran the middleware,
+// then hit the .Run() handler and NEVER reached MapControllers() below.
+// UseWhen() runs the middleware conditionally and then CONTINUES the main pipeline,
+// so controllers receive the request normally after the middleware passes.
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/api/admin"),
+    adminBranch => adminBranch.UseMiddleware<AdminIpWhitelistMiddleware>()
+);
 
 app.MapControllers();
 

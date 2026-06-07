@@ -13,6 +13,7 @@ public class TimeLogging
     {
 
         Stopwatch stopwatch = Stopwatch.StartNew();
+        Console.WriteLine($"Request has come from the ip : {context.Request.Headers["X-Forwarded-For"].FirstOrDefault()?? context.Connection.RemoteIpAddress?.ToString()}");
         // Handing the request to the next middleware in line
         await _next (context);
         
