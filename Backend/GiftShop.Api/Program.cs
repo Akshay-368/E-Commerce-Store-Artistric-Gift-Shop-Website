@@ -166,6 +166,35 @@ using (var scope = app.Services.CreateScope())
         await context.Database.MigrateAsync();
         Console.WriteLine("[Startup] Database migrations applied.");
 
+        // Seed default categories (matching the mock products in the frontend)
+        // These are seeded once so the admin can immediately assign categories when
+        // creating a product . the frontend mock data uses thee same category names.
+        var defaultCategories = new[]
+        {
+            ("Accessories",  "accessories",  "Bags, wallets, keychains, and wearable accessories"),
+            ("Home Decor",   "home-decor",   "Vases, candles, frames, and decorative items for the home"),
+            ("Kitchen",      "kitchen",      "Mugs, cups, and kitchen accessories"),
+            ("Stationery",   "stationery",   "Notebooks, journals, pens, and desk accessories"),
+            ("Jewellery",    "jewellery",    "Handcrafted rings, pendants, earrings, and necklaces"),
+            ("Gifting",      "gifting",      "Curated gift sets, hampers, and ready-to-gift items"),
+        };
+
+        foreach (var (name, slug, desc) in defaultCategories)
+        {
+            if (!await context.Categories.AnyAsync(c => c.Slug == slug))
+            {
+                context.Categories.Add(new GiftShop.Domain.Entities.Category
+                {
+                    Name = name,
+                    Slug = slug,
+                    Description = desc,
+                    IsActive = true
+                });
+            }
+        }
+        await context.SaveChangesAsync();
+        Console.WriteLine("[Startup] Default categories seeded.");
+        
         // Seed admin user if none exists
         if (!await context.AdminUsers.AnyAsync())
         {

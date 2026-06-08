@@ -41,7 +41,9 @@ public sealed class Product : EntityBase
 
     public int SortOrder { get; set; }
 
-    public Guid CategoryId { get; set; }
+    // NULLABLE: A product may exist without a category (e.g. "Uncategorized").
+    // This avoids the FK violation when the admin creates a product without picking a category.
+    public Guid? CategoryId { get; set; }
 
     public Category? Category { get; set; }
 

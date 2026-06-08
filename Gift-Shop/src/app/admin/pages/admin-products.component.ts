@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AppStateService } from '../../services/app-state.service';
-import { AdminApiService, AdminProduct, AdminProductImage } from '../services/admin-api.services';
+import { AdminApiService, AdminCategory, AdminProduct, AdminProductImage } from '../services/admin-api.services';
 
 type Mode = 'list' | 'create' | 'edit';
 
@@ -105,6 +105,24 @@ type Mode = 'list' | 'create' | 'edit';
                   <textarea [(ngModel)]="form.description" placeholder="Detailed product description..."
                     class="textarea" rows="5" maxlength="1000"></textarea>
                   <span class="char-count">{{ form.description.length }}/1000</span>
+                </div>
+
+                <!-- ── Category dropdown ── -->
+                <div class="field">
+                  <label>Category</label>
+                  @if (categoriesLoading()) {
+                    <div class="categories-loading">Loading categories…</div>
+                  } @else {
+                    <select [(ngModel)]="form.categoryId" class="input select-input">
+                      <option value="">— Uncategorized —</option>
+                      @for (cat of categories(); track cat.id) {
+                        <option [value]="cat.id">{{ cat.name }}</option>
+                      }
+                    </select>
+                    @if (categories().length === 0) {
+                      <p class="field-hint-warn">No categories found. <a class="link" routerLink="/admin/categories">Create one first</a>.</p>
+                    }
+                  }
                 </div>
 
                 <div class="field-row">
@@ -296,9 +314,15 @@ type Mode = 'list' | 'create' | 'edit';
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .input { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; width: 100%; }
     .input:focus { border-color: rgba(136,173,53,0.5); }
+    .select-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; padding-right: 34px; }
+    .select-input option { background: #1c1c20; color: #f0f0f0; }
     .textarea { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; width: 100%; resize: vertical; }
     .textarea:focus { border-color: rgba(136,173,53,0.5); }
     .char-count { font-size: 11px; color: #555; text-align: right; }
+    .categories-loading { font-size: 13px; color: #555; padding: 10px 0; }
+    .field-hint-warn { font-size: 11.5px; color: #ff9944; margin-top: 4px; }
+    .link { color: #88ad35; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
     .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; color: #c0c0c0; }
     .toggle-input { display: none; }
     .toggle-track { width: 36px; height: 20px; background: #333; border-radius: 10px; position: relative; flex-shrink: 0; transition: background 0.2s; }
@@ -352,6 +376,8 @@ type Mode = 'list' | 'create' | 'edit';
 export class AdminProductsComponent implements OnInit {
   mode = signal<Mode>('list');
   products = signal<AdminProduct[]>([]);
+  categories = signal<AdminCategory[]>([]);
+  categoriesLoading = signal(false);
   loading = signal(false);
   listError = signal('');
   saving = signal(false);
@@ -370,11 +396,15 @@ export class AdminProductsComponent implements OnInit {
     price: 0,
     sortOrder: 0,
     isActive: true,
+    categoryId: '',   // empty string means "no category selected"
   };
 
   constructor(private api: AdminApiService, private appState: AppStateService) {}
 
-  ngOnInit() { this.loadProducts(); }
+  ngOnInit() {
+    this.loadProducts();
+    this.loadCategories();
+  }
 
   loadProducts() {
     this.loading.set(true);
@@ -385,12 +415,20 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  loadCategories() {
+    this.categoriesLoading.set(true);
+    this.api.getCategories().subscribe({
+      next: cats => { this.categories.set(cats.filter(c => c.isActive)); this.categoriesLoading.set(false); },
+      error: () => { this.categoriesLoading.set(false); } // non-fatal
+    });
+  }
+
   primaryImage(p: AdminProduct): AdminProductImage | null {
     return p.images.find(i => i.isPrimary) ?? p.images[0] ?? null;
   }
 
   openCreate() {
-    this.form = { title: '', description: '', shortDescription: '', price: 0, sortOrder: 0, isActive: true };
+    this.form = { title: '', description: '', shortDescription: '', price: 0, sortOrder: 0, isActive: true, categoryId: '' };
     this.formError.set(''); this.formSuccess.set('');
     this.editingProduct.set(null);
     this.uploadProgress.set([]);
@@ -405,6 +443,7 @@ export class AdminProductsComponent implements OnInit {
       price: p.price,
       sortOrder: p.sortOrder,
       isActive: p.isActive,
+      categoryId: p.categoryId ?? '',
     };
     this.formError.set(''); this.formSuccess.set('');
     this.editingProduct.set({ ...p, images: [...p.images] });
@@ -429,6 +468,9 @@ export class AdminProductsComponent implements OnInit {
     this.formError.set('');
     this.formSuccess.set('');
 
+    // Convert empty string to undefined so the backend treats it as "no category"
+    const categoryId = this.form.categoryId || undefined;
+
     if (this.mode() === 'create') {
       this.api.createProduct({
         title: this.form.title.trim(),
@@ -436,18 +478,19 @@ export class AdminProductsComponent implements OnInit {
         shortDescription: this.form.shortDescription.trim() || undefined,
         price: this.form.price,
         sortOrder: this.form.sortOrder,
+        categoryId,
       }).subscribe({
         next: (created) => {
           this.saving.set(false);
           this.formSuccess.set('Product created! You can now upload images.');
-          this.editingProduct.set({ ...created, images: [] });
+          this.editingProduct.set({ ...created, images: created.images ?? [] });
           this.mode.set('edit');
-          // Trigger cache refresh in app state
+          // Asynchronously refresh the public catalog cache
           this.appState.loadProducts();
         },
         error: (err) => {
           this.saving.set(false);
-          this.formError.set(err?.error?.message ?? 'Failed to create product.');
+          this.formError.set(err?.error?.error ?? err?.error?.message ?? 'Failed to create product.');
         }
       });
     } else {
@@ -459,18 +502,18 @@ export class AdminProductsComponent implements OnInit {
         price: this.form.price,
         isActive: this.form.isActive,
         sortOrder: this.form.sortOrder,
-        categoryId: p.categoryId,
-      } as any).subscribe({
+        categoryId,
+      }).subscribe({
         next: (updated) => {
           this.saving.set(false);
           this.formSuccess.set('Changes saved successfully.');
           this.editingProduct.set({ ...updated, images: this.editingProduct()!.images });
-          // Signal public catalog to refresh
+          // Asynchronously refresh the public catalog cache
           this.appState.loadProducts();
         },
         error: (err) => {
           this.saving.set(false);
-          this.formError.set(err?.error?.message ?? 'Failed to save changes.');
+          this.formError.set(err?.error?.error ?? err?.error?.message ?? 'Failed to save changes.');
         }
       });
     }
@@ -513,11 +556,9 @@ export class AdminProductsComponent implements OnInit {
       const isFirst = this.editingProduct()!.images.length === 0 && idx === 0;
       this.api.uploadProductImage(productId, file, isFirst).subscribe({
         next: (img) => {
-          // Patch image into editingProduct
           const ep = this.editingProduct()!;
           this.editingProduct.set({ ...ep, images: [...ep.images, img] });
           this.uploadProgress.update(prev => prev.map((p, i) => i === idx ? { ...p, done: true } : p));
-          // Refresh public catalog cache
           this.appState.loadProducts();
         },
         error: (err) => {
