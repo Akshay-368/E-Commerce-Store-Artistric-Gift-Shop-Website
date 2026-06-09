@@ -29,7 +29,12 @@ export interface ProductItem {
   shortDescription?: string;
 }
 
-/** Non-product section images served as binary from the DB */
+/** 
+ * SiteContentItem - returned by /api/content (public).
+ * For Image items : imageUrl is either "api/content/{id}/image" (binary uploaded)
+ * or the full external URL (Unsplash/Cloudinary seed) - both render in <img src>.
+ * For Text items : textValue holds the copy.
+ * Non-product section images served as binary from the DB */
 export interface SiteContentItem {
   id: string;
   contentKey: string;
@@ -40,7 +45,7 @@ export interface SiteContentItem {
   displayLocation?: string;
   altText?: string;
   sortOrder: number;
-  imageUrl?: string; // /api/content/{id}/image
+  imageUrl?: string | null; // absolute external URL or /api/content/{id}/image
 }
 
 export interface CartItem {
@@ -74,6 +79,20 @@ export function getOptimizedUrl(storedDbUrl: string): string {
     : storedDbUrl;
 }
 
+/** Resolves a site content image url to something the <img> tag can use */
+export function resolveSiteImageUrl(imageUrl : string | null | undefined ): string {
+  if (!imageUrl) return '';
+  // Already a full http/https URL (UnSplash/Cloudinary external) -> use as-is
+  if (imageUrl.startsWith('http')) return imageUrl;
+  // Relative path from backend (binary blob) -> prefix with API base
+  return'${API_BASE}${imageUrl}';
+}
+
+// --- Loading Skeleton placeholder -------------
+// Show a shimmer placeholder while the API responds. No more mock data in the UI.
+const LOADING_PLACEHOLDER : ProductItem[] = [];
+
+
 // ── Fallback mock data while backend is being set up ───────────────────────
 const MOCK_PRODUCTS: ProductItem[] = [
   { id: 'p1', title: 'Minimalist Leather Wallet', price: '₹2,499', priceNum: 2499, category: 'Accessories', image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=1000&auto=format&fit=crop', images: [], description: 'A hand-stitched bifold leather wallet crafted from full-grain vegetable-tanned leather.' },
@@ -92,8 +111,9 @@ export class AppStateService {
   private isBrowser: boolean;
 
   // ── Products (loaded from API, fall back to mock) ──────────────────────
-  private productsSubject = new BehaviorSubject<ProductItem[]>(MOCK_PRODUCTS);
+  private productsSubject = new BehaviorSubject<ProductItem[]>(LOADING_PLACEHOLDER);
   products$ = this.productsSubject.asObservable();
+  productsLoaded = false ; // true once at least one successful fetch completes.
 
   // ── Site content items (section images + text from DB) ──────────────────
   private siteContentSubject = new BehaviorSubject<SiteContentItem[]>([]);
@@ -125,7 +145,7 @@ export class AppStateService {
     this.cartSubject = new BehaviorSubject<CartItem[]>(initialCart);
     this.cart$ = this.cartSubject.asObservable();
 
-    // Load real data from the API
+    // Load real data from the API on boot from db.
     this.loadProducts();
     this.loadSiteContent();
   }
@@ -157,10 +177,13 @@ export class AppStateService {
             shortDescription: p.shortDescription
           };
         });
+        this.productsLoaded = true;
         this.productsSubject.next(mapped);
       }),
       catchError(() => {
+        //Backend not running yet - empty array so the UI shows "no products"
         // Keep mock data on error (API not yet running)
+        this.productsSubject.next([]);
         return of(null);
       })
     ).subscribe();
@@ -181,7 +204,7 @@ export class AppStateService {
     return this.siteContentSubject.value
       .filter(i => i.sectionName === sectionName && i.kind === 'Image' && i.imageUrl)
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(i => `${API_BASE}${i.imageUrl}`);
+      .map(i => resolveSiteImageUrl(i.imageUrl));
   }
 
   /** Returns a text value for a given contentKey. */
@@ -235,7 +258,8 @@ export class AppStateService {
 
   createOrder(customer_name: string, customer_phone: string, customer_address: string): Order {
     const items = this.cartSubject.value.slice();
-    const id = 'ORD-2026-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const currentYear : string = new Date().getFullYear().toString();
+    const id = `ORD-${currentYear}-` + Math.random().toString(36).slice(2, 8).toUpperCase();
     const order: Order = {
       id, customer_name, customer_phone, customer_address, items,
       status: 'Pending Payment', created_at: new Date().toISOString(),

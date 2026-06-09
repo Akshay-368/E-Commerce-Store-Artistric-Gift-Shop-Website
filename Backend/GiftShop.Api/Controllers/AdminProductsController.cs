@@ -26,33 +26,72 @@ public sealed class AdminProductsController : ControllerBase
     }
 
     // ── GET /api/admin/products ─────────────────────────────────────────
+    // Admin sees ALL products (active AND inactive) — directly from DB, not cache.
+    // The public /api/products endpoint uses cache (active-only).
     [HttpGet]
-    public IActionResult GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var all = _cache.GetAll();
-        var paged = all.Skip((page - 1) * pageSize).Take(pageSize);
-        return Ok(new { total = all.Count, page, pageSize, items = paged });
+        var query = _db.Products
+            .AsNoTracking()
+            .Include(p => p.Images)
+            .Include(p => p.Category)
+            .OrderBy(p => p.SortOrder).ThenBy(p => p.Title);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new
+            {
+                p.Id, p.Title, p.Description, p.ShortDescription,
+                p.Price, p.IsActive, p.SortOrder,
+                CategoryId = p.CategoryId,
+                CategoryName = p.Category != null ? p.Category.Name : null,
+                Images = p.Images.OrderBy(i => i.SortOrder).Select(i => new
+                {
+                    i.Id, i.ImageUrl,
+                    OptimizedUrl = i.ImageUrl.Contains("/upload/")
+                        ? i.ImageUrl.Replace("/upload/", "/upload/f_auto,q_auto/")
+                        : i.ImageUrl,
+                    i.AltText, i.IsPrimary, i.SortOrder
+                })
+            })
+            .ToListAsync();
+
+        return Ok(new { total, page, pageSize, items });
     }
 
     // ── GET /api/admin/products/{id} ────────────────────────────────────
     [HttpGet("{id:guid}")]
-    public IActionResult GetById(Guid id)
+    public async Task<IActionResult> GetById(Guid id)
     {
-        var product = _cache.GetById(id);
+        var product = await _db.Products
+            .AsNoTracking()
+            .Include(p => p.Images)
+            .Include(p => p.Category)
+            .FirstOrDefaultAsync(p => p.Id == id);
         if (product == null) return NotFound();
-        return Ok(product);
+        return Ok(new
+        {
+            product.Id, product.Title, product.Description, product.ShortDescription,
+            product.Price, product.IsActive, product.SortOrder,
+            CategoryId = product.CategoryId,
+            CategoryName = product.Category?.Name,
+            Images = product.Images.OrderBy(i => i.SortOrder).Select(i => new
+            {
+                i.Id, i.ImageUrl,
+                OptimizedUrl = i.ImageUrl.Contains("/upload/")
+                    ? i.ImageUrl.Replace("/upload/", "/upload/f_auto,q_auto/")
+                    : i.ImageUrl,
+                i.AltText, i.IsPrimary, i.SortOrder
+            })
+        });
     }
 
     // ── POST /api/admin/products ─────────────────────────────────────────
     public sealed record CreateProductRequest(
-        string Title,
-        string Description,
-        decimal Price,
-        // CategoryId is explicitly optional — if omitted or null, product is "Uncategorized"
-        Guid? CategoryId,
-        string? ShortDescription,
-        int SortOrder = 0
-    );
+        string Title, string Description, decimal Price,
+        Guid? CategoryId, string? ShortDescription, int SortOrder = 0);
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest req)
@@ -64,14 +103,11 @@ public sealed class AdminProductsController : ControllerBase
         if (req.Price < 0)
             return BadRequest(new { error = "Price cannot be negative." });
 
-        // Validate CategoryId only if one was actually provided
         Guid? resolvedCategoryId = null;
         if (req.CategoryId.HasValue && req.CategoryId.Value != Guid.Empty)
         {
-            var categoryExists = await _db.Categories
-                .AnyAsync(c => c.Id == req.CategoryId.Value && c.IsActive);
-            if (!categoryExists)
-                return BadRequest(new { error = $"Category '{req.CategoryId}' does not exist or is inactive." });
+            var catExists = await _db.Categories.AnyAsync(c => c.Id == req.CategoryId.Value && c.IsActive);
+            if (!catExists) return BadRequest(new { error = "Category not found or inactive." });
             resolvedCategoryId = req.CategoryId.Value;
         }
 
@@ -81,33 +117,23 @@ public sealed class AdminProductsController : ControllerBase
 
         var product = new GiftShop.Domain.Entities.Product
         {
-            Title = req.Title.Trim(),
-            Slug = slug,
+            Title = req.Title.Trim(), Slug = slug,
             Description = req.Description.Trim(),
             ShortDescription = req.ShortDescription?.Trim(),
-            Price = req.Price,
-            CategoryId = resolvedCategoryId,   // NULL is fine now
-            SortOrder = req.SortOrder,
-            IsActive = true
+            Price = req.Price, CategoryId = resolvedCategoryId,
+            SortOrder = req.SortOrder, IsActive = true
         };
 
         _db.Products.Add(product);
         await _db.SaveChangesAsync();
         await _cache.RefreshCacheAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = product.Id }, _cache.GetById(product.Id));
+        return CreatedAtAction(nameof(GetById), new { id = product.Id }, await GetProductDto(product.Id));
     }
 
     // ── PUT /api/admin/products/{id} ────────────────────────────────────
     public sealed record UpdateProductRequest(
-        string Title,
-        string Description,
-        decimal Price,
-        Guid? CategoryId,
-        string? ShortDescription,
-        bool IsActive,
-        int SortOrder
-    );
+        string Title, string Description, decimal Price,
+        Guid? CategoryId, string? ShortDescription, bool IsActive, int SortOrder);
 
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductRequest req)
@@ -115,20 +141,15 @@ public sealed class AdminProductsController : ControllerBase
         var product = await _db.Products.FindAsync(id);
         if (product == null) return NotFound();
 
-        // Validate CategoryId if provided
-        Guid? resolvedCategoryId = product.CategoryId; // keep existing by default
+        Guid? resolvedCategoryId = product.CategoryId;
         if (req.CategoryId.HasValue)
         {
             if (req.CategoryId.Value == Guid.Empty)
-            {
-                resolvedCategoryId = null; // explicitly cleared
-            }
+                resolvedCategoryId = null;
             else
             {
-                var categoryExists = await _db.Categories
-                    .AnyAsync(c => c.Id == req.CategoryId.Value && c.IsActive);
-                if (!categoryExists)
-                    return BadRequest(new { error = $"Category '{req.CategoryId}' does not exist or is inactive." });
+                var catExists = await _db.Categories.AnyAsync(c => c.Id == req.CategoryId.Value && c.IsActive);
+                if (!catExists) return BadRequest(new { error = "Category not found or inactive." });
                 resolvedCategoryId = req.CategoryId.Value;
             }
         }
@@ -144,23 +165,20 @@ public sealed class AdminProductsController : ControllerBase
 
         await _db.SaveChangesAsync();
         await _cache.RefreshCacheAsync();
-        return Ok(_cache.GetById(id));
+        return Ok(await GetProductDto(id));
     }
 
     // ── DELETE /api/admin/products/{id} ──────────────────────────────────
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var product = await _db.Products
-            .Include(p => p.Images)
-            .FirstOrDefaultAsync(p => p.Id == id);
-
+        var product = await _db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == id);
         if (product == null) return NotFound();
 
         foreach (var img in product.Images.Where(i => !string.IsNullOrEmpty(i.PublicId)))
         {
             try { await _cloudinary.DeleteImageAsync(img.PublicId!); }
-            catch { /* log but continue */ }
+            catch { /* log, continue */ }
         }
 
         _db.Products.Remove(product);
@@ -177,11 +195,8 @@ public sealed class AdminProductsController : ControllerBase
         var product = await _db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == id);
         if (product == null) return NotFound();
 
-        if (file == null || file.Length == 0)
-            return BadRequest(new { error = "No file uploaded." });
-
-        if (file.Length > 8 * 1024 * 1024)
-            return BadRequest(new { error = "File exceeds the 8 MB maximum." });
+        if (file == null || file.Length == 0) return BadRequest(new { error = "No file uploaded." });
+        if (file.Length > 8 * 1024 * 1024) return BadRequest(new { error = "File exceeds 8 MB maximum." });
 
         var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp", "image/gif" };
         if (!allowedTypes.Contains(file.ContentType.ToLowerInvariant()))
@@ -191,35 +206,23 @@ public sealed class AdminProductsController : ControllerBase
         var (url, publicId) = await _cloudinary.UploadProductImageAsync(stream, file.FileName);
 
         if (isPrimary)
-        {
-            foreach (var existingImg in product.Images.Where(i => i.IsPrimary))
-                existingImg.IsPrimary = false;
-        }
+            foreach (var e in product.Images.Where(i => i.IsPrimary)) e.IsPrimary = false;
 
-        var nextSortOrder = product.Images.Any() ? product.Images.Max(i => i.SortOrder) + 1 : 0;
-
+        var nextSort = product.Images.Any() ? product.Images.Max(i => i.SortOrder) + 1 : 0;
         var image = new GiftShop.Domain.Entities.ProductImage
         {
-            ProductId = id,
-            ImageUrl = url,
-            PublicId = publicId,
-            AltText = file.FileName,
-            IsPrimary = isPrimary || !product.Images.Any(),
-            SortOrder = nextSortOrder
+            ProductId = id, ImageUrl = url, PublicId = publicId,
+            AltText = file.FileName, IsPrimary = isPrimary || !product.Images.Any(),
+            SortOrder = nextSort
         };
 
         _db.ProductImages.Add(image);
         await _db.SaveChangesAsync();
         await _cache.RefreshCacheAsync();
 
-        return Ok(new ProductImageDto(
-            image.Id,
-            image.ImageUrl,
-            image.PublicId,
-            image.AltText,
-            image.IsPrimary,
-            image.SortOrder
-        ));
+        return Ok(new ProductImageDto(image.Id, image.ImageUrl,
+            image.ImageUrl.Replace("/upload/", "/upload/f_auto,q_auto/"),
+            image.PublicId, image.AltText, image.IsPrimary, image.SortOrder));
     }
 
     // ── DELETE /api/admin/products/{id}/images/{imageId} ──────────────────
@@ -230,10 +233,7 @@ public sealed class AdminProductsController : ControllerBase
         if (image == null) return NotFound();
 
         if (!string.IsNullOrEmpty(image.PublicId))
-        {
-            try { await _cloudinary.DeleteImageAsync(image.PublicId); }
-            catch { /* non-fatal */ }
-        }
+            try { await _cloudinary.DeleteImageAsync(image.PublicId); } catch { /* non-fatal */ }
 
         _db.ProductImages.Remove(image);
         await _db.SaveChangesAsync();
@@ -253,15 +253,35 @@ public sealed class AdminProductsController : ControllerBase
         return Ok();
     }
 
-    // ── Private helpers ──────────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────
     private static string Slugify(string input)
         => System.Text.RegularExpressions.Regex
-            .Replace(input.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-")
-            .Trim('-');
+            .Replace(input.ToLowerInvariant().Trim(), @"[^a-z0-9]+", "-").Trim('-');
+
+    private async Task<object> GetProductDto(Guid id)
+    {
+        var p = await _db.Products.AsNoTracking()
+            .Include(x => x.Images).Include(x => x.Category)
+            .FirstOrDefaultAsync(x => x.Id == id);
+        if (p == null) return new { };
+        return new
+        {
+            p.Id, p.Title, p.Description, p.ShortDescription,
+            p.Price, p.IsActive, p.SortOrder,
+            CategoryId = p.CategoryId,
+            CategoryName = p.Category?.Name,
+            Images = p.Images.OrderBy(i => i.SortOrder).Select(i => new
+            {
+                i.Id, i.ImageUrl,
+                OptimizedUrl = i.ImageUrl.Contains("/upload/")
+                    ? i.ImageUrl.Replace("/upload/", "/upload/f_auto,q_auto/")
+                    : i.ImageUrl,
+                i.AltText, i.IsPrimary, i.SortOrder
+            })
+        };
+    }
 
     private sealed record ProductImageDto(
-        Guid Id, string ImageUrl, string? PublicId, string? AltText, bool IsPrimary, int SortOrder)
-    {
-        public string OptimizedUrl => ImageUrl.Replace("/upload/", "/upload/f_auto,q_auto/");
-    }
+        Guid Id, string ImageUrl, string OptimizedUrl,
+        string? PublicId, string? AltText, bool IsPrimary, int SortOrder);
 }

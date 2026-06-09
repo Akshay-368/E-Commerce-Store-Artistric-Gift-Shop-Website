@@ -1,10 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
-import { AppStateService, ProductItem, SiteContentItem } from '../services/app-state.service';
+import { AppStateService, ProductItem, SiteContentItem, resolveSiteImageUrl } from '../services/app-state.service';
 import { ProductCardComponent } from './product-card.component';
 import { SectionSlideshowComponent } from './section-slideshow.component';
-
-const API_BASE = 'http://localhost:5000';
 
 @Component({
   selector: 'app-home',
@@ -12,17 +10,15 @@ const API_BASE = 'http://localhost:5000';
   imports: [CommonModule, ProductCardComponent, SectionSlideshowComponent],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════════
-         SECTION 1 — HERO (full-viewport with DB-driven slideshow)
+         SECTION 1 — HERO
     ══════════════════════════════════════════════════════════════════════ -->
     <section class="hero" id="hero">
-      <!-- Slideshow background — if no DB images, falls back to Unsplash -->
       <div class="hero-bg">
         <app-section-slideshow
           *ngIf="heroImages.length > 0"
           [images]="heroImages"
           [interval]="6000">
         </app-section-slideshow>
-        <!-- Static fallback while images load or if none in DB yet -->
         <div class="hero-bg-fallback" *ngIf="heroImages.length === 0"></div>
       </div>
       <div class="hero-overlay"></div>
@@ -52,22 +48,14 @@ const API_BASE = 'http://localhost:5000';
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         SECTION 3 — FEATURE ALPHA (Left text, Right image slideshow)
+         SECTION 3 — FEATURE ALPHA
     ══════════════════════════════════════════════════════════════════════ -->
     <section class="feature-section" id="feature-1">
       <div class="container">
         <div class="feature-grid">
           <div class="feature-img-wrap">
-            <app-section-slideshow
-              *ngIf="feature1Images.length > 0"
-              [images]="feature1Images"
-              [interval]="5500">
-            </app-section-slideshow>
-            <!-- Fallback static image -->
-            <img
-              *ngIf="feature1Images.length === 0"
-              src="/assets/handcrafted-i-love-u-chocolate-bar.jpeg"
-              alt="Crafted by hand" />
+            <app-section-slideshow *ngIf="feature1Images.length > 0" [images]="feature1Images" [interval]="5500"></app-section-slideshow>
+            <img *ngIf="feature1Images.length === 0" src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop" alt="Crafted by hand" />
           </div>
           <div class="feature-text">
             <div class="section-eyebrow eyebrow-left">The Artist's Touch</div>
@@ -84,21 +72,14 @@ const API_BASE = 'http://localhost:5000';
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         SECTION 4 — FEATURE BETA (Right text, Left image slideshow)
+         SECTION 4 — FEATURE BETA
     ══════════════════════════════════════════════════════════════════════ -->
     <section class="feature-section alt" id="feature-2">
       <div class="container">
         <div class="feature-grid reverse">
           <div class="feature-img-wrap">
-            <app-section-slideshow
-              *ngIf="feature2Images.length > 0"
-              [images]="feature2Images"
-              [interval]="5000">
-            </app-section-slideshow>
-            <img
-              *ngIf="feature2Images.length === 0"
-              src="https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop"
-              alt="Unboxing experience" />
+            <app-section-slideshow *ngIf="feature2Images.length > 0" [images]="feature2Images" [interval]="5000"></app-section-slideshow>
+            <img *ngIf="feature2Images.length === 0" src="https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop" alt="Unboxing experience" />
           </div>
           <div class="feature-text">
             <div class="section-eyebrow eyebrow-left">The Art of Giving</div>
@@ -115,7 +96,7 @@ const API_BASE = 'http://localhost:5000';
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         SECTION 5 — HIGHLIGHTS CLOUD
+         SECTION 5 — HIGHLIGHTS
     ══════════════════════════════════════════════════════════════════════ -->
     <section class="highlights" id="highlights">
       <div class="container">
@@ -149,7 +130,7 @@ const API_BASE = 'http://localhost:5000';
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         SECTION 6 — CATALOG GRID
+         SECTION 6 — CATALOG
     ══════════════════════════════════════════════════════════════════════ -->
     <section class="catalog" id="catalog">
       <div class="container">
@@ -175,16 +156,23 @@ const API_BASE = 'http://localhost:5000';
           </div>
         </div>
 
-        <div class="product-grid">
+        <!-- Loading shimmer while products fetch -->
+        <div class="product-grid" *ngIf="isLoading && !productsLoaded">
+          <div class="product-skeleton" *ngFor="let s of skeletons"></div>
+        </div>
+
+        <!-- Actual product grid -->
+        <div class="product-grid" *ngIf="productsLoaded || !isLoading">
           <app-product-card
             *ngFor="let product of visibleProducts; trackBy: trackById"
             [product]="product">
           </app-product-card>
         </div>
 
-        <div class="empty-state" *ngIf="visibleProducts.length === 0">
+        <div class="empty-state" *ngIf="(productsLoaded || !isLoading) && filteredProducts.length === 0">
           <div class="empty-icon">🎁</div>
-          <p>No products found matching your search.</p>
+          <p *ngIf="searchQuery || selectedCategory">No products found matching your search.</p>
+          <p *ngIf="!searchQuery && !selectedCategory">Our catalog is loading — check back shortly!</p>
         </div>
 
         <div class="load-more-row" *ngIf="hasMore">
@@ -217,8 +205,6 @@ const API_BASE = 'http://localhost:5000';
   `,
   styles: [`
     :host{display:block}
-
-    /* ── Hero ─────────────────────────────────────────────────────────── */
     .hero{position:relative;min-height:90vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
     .hero-bg{position:absolute;inset:0}
     .hero-bg-fallback{position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop');background-size:cover;background-position:center}
@@ -236,8 +222,6 @@ const API_BASE = 'http://localhost:5000';
     .btn-hero-ghost:hover{background:rgba(255,255,255,0.12);border-color:#fff}
     .hero-scroll{position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:0.4rem;color:rgba(255,255,255,0.6);font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;animation:bounce 2s infinite}
     .hero-scroll::after{content:'↓';font-size:1.1rem}
-
-    /* ── Manifesto ────────────────────────────────────────────────────── */
     .manifesto{background:var(--color-sage);padding:5rem 0}
     .manifesto-inner{max-width:860px;margin:0 auto;text-align:center;padding:0 2rem}
     .section-eyebrow{font-size:0.78rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-primary);margin-bottom:1.2rem;display:flex;align-items:center;justify-content:center;gap:0.6rem}
@@ -249,13 +233,11 @@ const API_BASE = 'http://localhost:5000';
     .manifesto blockquote::before{content:'"';font-size:7rem;line-height:0.7;color:var(--color-primary);opacity:0.3;position:absolute;top:0.4rem;left:0;font-style:normal}
     .manifesto-sig{margin-top:2rem;font-size:0.9rem;color:var(--color-body);font-weight:500;display:flex;align-items:center;justify-content:center;gap:0.5rem}
     .manifesto-sig::before{content:'—'}
-
-    /* ── Feature sections ─────────────────────────────────────────────── */
     .feature-section{padding:5.5rem 0;background:#fff}
     .feature-section.alt{background:var(--color-bg)}
     .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center}
     .feature-grid.reverse{direction:rtl}
-    .feature-grid.reverse > *{direction:ltr}
+    .feature-grid.reverse>*{direction:ltr}
     .feature-img-wrap{position:relative;border-radius:var(--radius);overflow:hidden;aspect-ratio:4/5;box-shadow:var(--shadow-lift)}
     .feature-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease}
     .feature-img-wrap:hover img{transform:scale(1.04)}
@@ -265,8 +247,6 @@ const API_BASE = 'http://localhost:5000';
     .feature-text p{font-size:1.05rem;line-height:1.75;color:var(--color-body);margin-bottom:1.5rem}
     .feature-detail{display:flex;align-items:center;gap:0.8rem;background:var(--color-sage);border-radius:12px;padding:0.9rem 1.2rem;font-size:0.9rem;color:var(--color-charcoal);font-weight:500}
     .feature-detail-icon{font-size:1.4rem;flex-shrink:0}
-
-    /* ── Highlights ───────────────────────────────────────────────────── */
     .highlights{background:var(--color-sage);padding:5rem 0}
     .highlights-header{text-align:center;margin-bottom:3.5rem}
     .highlights-header h2{font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.4rem);color:var(--color-charcoal);font-weight:700}
@@ -274,14 +254,12 @@ const API_BASE = 'http://localhost:5000';
     .highlight-card{background:#fff;border-radius:var(--radius);padding:2rem 1.6rem;text-align:center;box-shadow:var(--shadow-card);transition:var(--transition)}
     .highlight-card:hover{transform:translateY(-5px);box-shadow:var(--shadow-lift)}
     .highlight-icon-wrap{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 1rem}
-    .highlight-card:nth-child(1) .highlight-icon-wrap{background:rgba(136,173,53,0.15);color:var(--color-primary)}
-    .highlight-card:nth-child(2) .highlight-icon-wrap{background:rgba(136,173,53,0.12);color:var(--color-primary-d)}
-    .highlight-card:nth-child(3) .highlight-icon-wrap{background:rgba(34,34,34,0.08);color:var(--color-charcoal)}
-    .highlight-card:nth-child(4) .highlight-icon-wrap{background:rgba(105,137,39,0.12);color:var(--color-primary-d)}
+    .highlight-card:nth-child(1) .highlight-icon-wrap{background:rgba(136,173,53,0.15)}
+    .highlight-card:nth-child(2) .highlight-icon-wrap{background:rgba(136,173,53,0.12)}
+    .highlight-card:nth-child(3) .highlight-icon-wrap{background:rgba(34,34,34,0.08)}
+    .highlight-card:nth-child(4) .highlight-icon-wrap{background:rgba(105,137,39,0.12)}
     .highlight-card h4{font-family:var(--font-ui);font-size:1rem;font-weight:600;color:var(--color-charcoal);margin-bottom:0.4rem}
     .highlight-card p{font-size:0.88rem;color:var(--color-body);line-height:1.5}
-
-    /* ── Catalog ──────────────────────────────────────────────────────── */
     .catalog{padding:5.5rem 0;background:#fff}
     .catalog-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2.5rem;gap:1.5rem;flex-wrap:wrap}
     .catalog-title-group h2{font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.4rem);color:var(--color-charcoal);font-weight:700;line-height:1.2}
@@ -294,13 +272,14 @@ const API_BASE = 'http://localhost:5000';
     .filter-select{border:1.5px solid var(--color-border);border-radius:50px;padding:0.6rem 2rem 0.6rem 1rem;font-size:0.9rem;font-family:var(--font-ui);background:var(--color-bg);outline:none;cursor:pointer;transition:var(--transition)}
     .filter-select:focus{border-color:var(--color-primary)}
     .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.75rem}
+    /* Loading skeleton */
+    .product-skeleton{height:360px;border-radius:var(--radius);background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.3s infinite}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
     .load-more-row{text-align:center;margin-top:3.5rem}
     .btn-load-more{background:transparent;border:2px solid var(--color-primary);color:var(--color-primary);padding:0.85rem 2.8rem;border-radius:50px;font-size:0.95rem;font-weight:600;transition:var(--transition)}
     .btn-load-more:hover{background:var(--color-primary);color:#fff}
     .empty-state{text-align:center;padding:4rem 0;color:var(--color-body)}
     .empty-icon{font-size:3rem;margin-bottom:1rem}
-
-    /* ── Footer ───────────────────────────────────────────────────────── */
     .site-footer{background:var(--color-charcoal);color:rgba(255,255,255,0.7);padding:3rem 0 2rem}
     .footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem}
     .footer-brand{display:flex;align-items:center;gap:0.75rem}
@@ -311,26 +290,10 @@ const API_BASE = 'http://localhost:5000';
     .footer-links{display:flex;gap:1.5rem;font-size:0.83rem}
     .footer-links a{transition:var(--transition)}
     .footer-links a:hover{color:var(--color-primary)}
-
     @keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
-
-    @media (max-width:900px){
-      .feature-grid{grid-template-columns:1fr;gap:2.5rem}
-      .feature-grid.reverse{direction:ltr}
-      .feature-img-wrap{aspect-ratio:16/9}
-      .catalog-header{flex-direction:column;align-items:flex-start}
-    }
-    @media (max-width:600px){
-      .container{padding:0 1.25rem}
-      .product-grid{grid-template-columns:1fr 1fr;gap:1rem}
-      .manifesto blockquote{padding:0 1rem}
-      .footer-inner{flex-direction:column;align-items:center;text-align:center}
-      .footer-links{justify-content:center;flex-wrap:wrap}
-    }
-    @media (max-width:420px){
-      .product-grid{grid-template-columns:1fr}
-      .hero-content h1{font-size:2rem}
-    }
+    @media (max-width:900px){.feature-grid{grid-template-columns:1fr;gap:2.5rem}.feature-grid.reverse{direction:ltr}.feature-img-wrap{aspect-ratio:16/9}.catalog-header{flex-direction:column;align-items:flex-start}}
+    @media (max-width:600px){.product-grid{grid-template-columns:1fr 1fr;gap:1rem}.manifesto blockquote{padding:0 1rem}.footer-inner{flex-direction:column;align-items:center;text-align:center}.footer-links{justify-content:center;flex-wrap:wrap}}
+    @media (max-width:420px){.product-grid{grid-template-columns:1fr}.hero-content h1{font-size:2rem}}
   `]
 })
 export class HomeComponent implements OnInit {
@@ -338,15 +301,16 @@ export class HomeComponent implements OnInit {
 
   searchQuery = '';
   selectedCategory = '';
-  displayedCount = 6;
+  displayedCount = 8;   // initial grid size
   categories: string[] = [];
+  isLoading = true;
+  productsLoaded = false;
+  skeletons = [1,2,3,4,5,6,7,8];
 
-  // ── Section image URLs (from DB binary, served via /api/content/{id}/image)
   heroImages: string[] = [];
   feature1Images: string[] = [];
   feature2Images: string[] = [];
 
-  // ── Section text (from DB or fallback defaults inline)
   heroHeading: string | null = null;
   heroSubheading: string | null = null;
   heroCopy: string | null = null;
@@ -357,24 +321,30 @@ export class HomeComponent implements OnInit {
   constructor(private state: AppStateService) {}
 
   ngOnInit(): void {
-    // Subscribe to products (live-updating when API loads)
+    // Products subscription — reset displayedCount when the product list changes
+    // so "load more" is computed against the new full list correctly.
     this.state.products$.subscribe(products => {
       this.allProducts = products;
+      this.isLoading = false;
+      this.productsLoaded = this.state.productsLoaded;
       this.categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+      // Reset page when the whole catalog refreshes (e.g. after admin adds a product)
+      this.displayedCount = 8;
     });
 
-    // Subscribe to site content (section images + text)
+    // Site content subscription — always resolves URLs correctly regardless of
+    // whether images are binary-served (/api/content/{id}/image) or external URLs.
     this.state.siteContent$.subscribe(items => {
-      this.heroImages = this.buildImageUrls(items, 'hero');
+      this.heroImages    = this.buildImageUrls(items, 'hero');
       this.feature1Images = this.buildImageUrls(items, 'feature-1');
       this.feature2Images = this.buildImageUrls(items, 'feature-2');
 
-      this.heroHeading      = this.getTextValue(items, 'hero.heading');
-      this.heroSubheading   = this.getTextValue(items, 'hero.subheading');
-      this.heroCopy         = this.getTextValue(items, 'hero.copy');
-      this.manifestoQuote   = this.getTextValue(items, 'manifesto.quote');
-      this.feature1Para1    = this.getTextValue(items, 'feature-1.para1');
-      this.feature2Para1    = this.getTextValue(items, 'feature-2.para1');
+      this.heroHeading    = this.getTextValue(items, 'hero.heading');
+      this.heroSubheading = this.getTextValue(items, 'hero.subheading');
+      this.heroCopy       = this.getTextValue(items, 'hero.copy');
+      this.manifestoQuote = this.getTextValue(items, 'manifesto.quote');
+      this.feature1Para1  = this.getTextValue(items, 'feature-1.para1');
+      this.feature2Para1  = this.getTextValue(items, 'feature-2.para1');
     });
   }
 
@@ -382,14 +352,13 @@ export class HomeComponent implements OnInit {
     return items
       .filter(i => i.sectionName === section && i.kind === 'Image' && i.imageUrl)
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(i => `http://localhost:5000${i.imageUrl}`);
+      .map(i => resolveSiteImageUrl(i.imageUrl)); // handles both external URLs and /api/... paths
   }
 
   private getTextValue(items: SiteContentItem[], key: string): string | null {
     return items.find(i => i.contentKey === key && i.kind === 'Text')?.textValue ?? null;
   }
 
-  // ── Catalog logic ──────────────────────────────────────────────────────
   get filteredProducts(): ProductItem[] {
     const q = this.searchQuery.trim().toLowerCase();
     return this.allProducts.filter(p => {
@@ -410,9 +379,9 @@ export class HomeComponent implements OnInit {
     return this.filteredProducts.length > this.displayedCount;
   }
 
-  onSearch(value: string): void { this.searchQuery = value; this.displayedCount = 6; }
-  onFilter(value: string): void { this.selectedCategory = value; this.displayedCount = 6; }
-  loadMore(): void { this.displayedCount += 4; }
+  onSearch(value: string): void { this.searchQuery = value; this.displayedCount = 8; }
+  onFilter(value: string): void { this.selectedCategory = value; this.displayedCount = 8; }
+  loadMore(): void { this.displayedCount += 8; }
   trackById(_: number, p: ProductItem): string { return p.id; }
   scrollTo(id: string): void { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
 }

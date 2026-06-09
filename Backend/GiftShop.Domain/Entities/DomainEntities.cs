@@ -60,9 +60,16 @@ public sealed class ProductImage : EntityBase
 
     public Product? Product { get; set; }
 
+    /// <summary>
+    /// Cloudinary CDN URL (preferred) or any public https URL.
+    /// For seeded mock products this holds the Unsplash URL directly.
+    /// </summary>
     [MaxLength(600)]
     public string ImageUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Cloudinary public_id - null for external/Unsplash images.
+    /// </summary>
     [MaxLength(240)]
     public string? PublicId { get; set; }
 
@@ -192,9 +199,16 @@ public sealed class SiteContentItem : EntityBase
 
     public SiteContentItemKind Kind { get; set; }
 
+    /// <summary>
+    /// For Text items : The text value.
+    /// For Image items : Used as caption/alt override.
+    /// </summary>
     [MaxLength(600)]
     public string? TextValue { get; set; }
 
+    /// <summary>
+    /// Binary image data (uploaded by admin). When present takes priority over ExternalImageUrl.
+    /// </summary>
     public byte[]? BinaryValue { get; set; }
 
     [MaxLength(100)]
@@ -205,6 +219,13 @@ public sealed class SiteContentItem : EntityBase
 
     [MaxLength(200)]
     public string? AltText { get; set; }
+
+    /// <summary>
+    /// External/CDN image Url (Cloudinary, Unsplash , etc).
+    /// Used as fallback when BinaryValue is null - allows seeding default images without storing binary blobs. The admin can later replace these with proper uploads.
+    /// </summary>
+    [MaxLength(700)]
+    public string? ExternalImageUrl {get;set;}
 
     public int SortOrder { get; set; }
 

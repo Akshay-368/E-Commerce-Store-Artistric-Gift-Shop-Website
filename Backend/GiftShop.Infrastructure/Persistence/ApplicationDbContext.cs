@@ -130,6 +130,7 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(x => x.Kind).HasConversion<string>();
             entity.Property(x => x.TextValue).HasMaxLength(600);
             entity.Property(x => x.BinaryValue).HasColumnType("bytea");
+            entity.Property(x => x.ExternalImageUrl).HasMaxLength(700);
         });
 
         modelBuilder.Entity<AdminAccessBan>(entity =>

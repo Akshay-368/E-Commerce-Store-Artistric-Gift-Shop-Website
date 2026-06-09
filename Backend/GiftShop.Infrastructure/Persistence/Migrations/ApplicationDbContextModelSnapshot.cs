@@ -440,6 +440,10 @@ namespace GiftShop.Infrastructure.Persistence.Migrations
 
                     b.Property<byte[]>("BinaryValue")
                         .HasColumnType("bytea");
+                    
+                    b.Property<string>("ExternalImageUrl")
+                            .HasMaxLength(700)
+                            .HasColumnType("character varying(700)");
 
                     b.Property<string>("ContentKey")
                         .IsRequired()

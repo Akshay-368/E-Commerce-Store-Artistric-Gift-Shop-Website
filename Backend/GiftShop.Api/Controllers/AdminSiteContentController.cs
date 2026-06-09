@@ -14,6 +14,7 @@ namespace GiftShop.Api.Controllers;
 /// 
 /// Multiple images per section are stored with the same SectionName but different SortOrder.
 /// The frontend slideshows through them automatically.
+/// Image priority: BinaryValue (admin-uploaded) > ExternalImageUrl (seeded default / CDN).
 /// </summary>
 [ApiController]
 [Route("api/admin/content")]
@@ -34,7 +35,7 @@ public sealed class AdminSiteContentController : ControllerBase
             .Select(i => new SiteContentSummaryDto(
                 i.Id, i.ContentKey, i.SectionName, i.Kind.ToString(),
                 i.TextValue, i.MimeType, i.DisplayLocation, i.AltText,
-                i.SortOrder, i.IsActive, i.BinaryValue != null))
+                i.SortOrder, i.IsActive, i.BinaryValue != null , i.ExternalImageUrl))
             .ToListAsync();
         return Ok(items);
     }
@@ -42,7 +43,7 @@ public sealed class AdminSiteContentController : ControllerBase
     private sealed record SiteContentSummaryDto(
         Guid Id, string ContentKey, string SectionName, string Kind,
         string? TextValue, string? MimeType, string? DisplayLocation,
-        string? AltText, int SortOrder, bool IsActive, bool HasBinary);
+        string? AltText, int SortOrder, bool IsActive, bool HasBinary ,string? ExternalImageUrl);
 
     // ── GET /api/content (public: returns text items + image URLs, NOT binary) ─
     [HttpGet("/api/content")]
@@ -64,8 +65,11 @@ public sealed class AdminSiteContentController : ControllerBase
                 i.DisplayLocation,
                 i.AltText,
                 i.SortOrder,
+                // Binary uploaded images get served via /api/content/{id}/image.
+                // Exrernal-URL images (seeded defaults) are served directly.
+                // The frontend checks imageUrl firts and resolves the right source.
                 // Provide image URL endpoint — binary served separately
-                ImageUrl = i.Kind == SiteContentItemKind.Image ? $"/api/content/{i.Id}/image" : null
+                ImageUrl = i.Kind == SiteContentItemKind.Image ? (i.BinaryValue != null ? $"/api/content/{i.Id}/image" : i.ExternalImageUrl) : null
             })
             .ToListAsync();
         return Ok(items);
@@ -79,14 +83,26 @@ public sealed class AdminSiteContentController : ControllerBase
         var item = await _db.SiteContentItems
             .AsNoTracking()
             .Where(i => i.Id == id && i.Kind == SiteContentItemKind.Image && i.IsActive)
-            .Select(i => new { i.BinaryValue, i.MimeType })
+            .Select(i => new { i.BinaryValue, i.MimeType , i.ExternalImageUrl})
             .FirstOrDefaultAsync();
+        
+        if (item == null) return NotFound();
 
-        if (item?.BinaryValue == null) return NotFound();
+        // It binary was uploaded by admin, serve it directly
+        if (item.BinaryValue != null) 
+        {
+            Response.Headers["Cache-Control"] = "public, max-age=86400"; // 24h browser cache
+            return File(item.BinaryValue ,item.MimeType ?? "image/jpeg");
+            //return NotFound();
+        }
 
-        var mime = item.MimeType ?? "image/jpeg";
-        Response.Headers["Cache-Control"] = "public, max-age=86400"; // 24h browser cache
-        return File(item.BinaryValue, mime);
+        // Otherwise redirect to the external url (unslpash / cloudinary default)
+        if (!string.IsNullOrEmpty(item.ExternalImageUrl)) return Redirect(item.ExternalImageUrl);
+        return NotFound();
+
+        /* var mime = item.MimeType ?? "image/jpeg";
+        Response.Headers["Cache-Control"] = "public, max-age=86400"; 
+        return File(item.BinaryValue, mime); */
     }
 
     // ── POST /api/admin/content/image ────────────────────────────────────
@@ -113,25 +129,41 @@ public sealed class AdminSiteContentController : ControllerBase
         await using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
 
-        var item = new SiteContentItem
+        // If a seeded item with this contentKey exists, update it instead of creating a duplicate
+        var existing = await _db.SiteContentItems.FirstOrDefaultAsync(i => i.ContentKey == contentKey);
+        if (existing != null)
         {
-            ContentKey = contentKey,
-            SectionName = section,
-            Kind = SiteContentItemKind.Image,
-            BinaryValue = ms.ToArray(),
-            MimeType = file.ContentType,
-            AltText = altText,
-            DisplayLocation = displayLocation,
-            SortOrder = sortOrder,
-            IsActive = true
-        };
+            existing.BinaryValue = ms.ToArray();
+            existing.MimeType = file.ContentType;
+            existing.AltText = altText ?? existing.AltText;
+            existing.IsActive = true;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        else
+        {
+            var item = new SiteContentItem
+            {
+                ContentKey = contentKey,
+                SectionName = section,
+                Kind = SiteContentItemKind.Image,
+                BinaryValue = ms.ToArray(),
+                MimeType = file.ContentType,
+                AltText = altText,
+                DisplayLocation = displayLocation,
+                SortOrder = sortOrder,
+                IsActive = true
+            };
+            _db.SiteContentItems.Add(item);
+        }
 
-        _db.SiteContentItems.Add(item);
         await _db.SaveChangesAsync();
+        var saved = await _db.SiteContentItems.FirstAsync(i => i.ContentKey == contentKey);
 
-        return CreatedAtAction(nameof(GetImage), new { id = item.Id },
-            new { item.Id, item.ContentKey, item.SectionName, item.AltText, item.SortOrder,
-                  ImageUrl = $"/api/content/{item.Id}/image" });
+        return Ok(new
+        {
+            saved.Id, saved.ContentKey, saved.SectionName, saved.AltText, saved.SortOrder,
+            ImageUrl = $"/api/content/{saved.Id}/image"
+        });
     }
 
     // ── PUT /api/admin/content/text ──────────────────────────────────────
@@ -150,6 +182,7 @@ public sealed class AdminSiteContentController : ControllerBase
             existing.TextValue = req.TextValue;
             existing.SortOrder = req.SortOrder;
             existing.DisplayLocation = req.DisplayLocation;
+            existing.UpdatedAt = DateTimeOffset.UtcNow;
         }
         else
         {
@@ -187,6 +220,7 @@ public sealed class AdminSiteContentController : ControllerBase
         var item = await _db.SiteContentItems.FindAsync(id);
         if (item == null) return NotFound();
         item.IsActive = !item.IsActive;
+        item.UpdatedAt= DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
         return Ok(new { item.Id, item.IsActive });
     }
