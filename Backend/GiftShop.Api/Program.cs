@@ -171,6 +171,27 @@ using (var scope = app.Services.CreateScope())
         await context.Database.MigrateAsync();
         logger.LogInformation("[Startup] Database migrations applied.");
 
+        // ── Defensive column guard ────────────────────────────────────────
+        // Adds any schema changes that may not have been applied yet due to
+        // missing Designer.cs files in earlier migration runs. These are all
+        // idempotent (IF NOT EXISTS / IF EXISTS) so safe to run every startup.
+        //
+        // WHY: EF Core needs both the .cs and .Designer.cs file for each migration
+        // to correctly track which migrations have been applied. If the Designer.cs
+        // was missing when `dotnet run` was first executed, the migration was recorded
+        // in __EFMigrationsHistory but the ALTER TABLE was never actually run against
+        // the real database — leaving the code and DB schema out of sync.
+        //
+        // This raw SQL block bridges that gap permanently regardless of history state.
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE public.""SiteContentItems""
+                ADD COLUMN IF NOT EXISTS ""ExternalImageUrl"" character varying(700) NULL;
+
+            ALTER TABLE public.""Products""
+                ALTER COLUMN ""CategoryId"" DROP NOT NULL;
+        ");
+        logger.LogInformation("[Startup] Defensive schema guard applied.");
+
         // Seed default categories (matching the mock products in the frontend)
         // These are seeded once so the admin can immediately assign categories when
         // creating a product . the frontend mock data uses thee same category names.
