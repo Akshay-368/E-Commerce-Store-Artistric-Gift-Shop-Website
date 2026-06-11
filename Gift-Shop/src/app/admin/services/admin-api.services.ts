@@ -220,6 +220,8 @@ export interface SiteContentSummary {
   sortOrder: number;
   isActive: boolean;
   hasBinary: boolean;
+  /** External/CDN URL for seeded default images (Unsplash , etc.) */
+  externalImageUrl?: string | null ;
 }
 
 @Injectable({ providedIn: 'root' })

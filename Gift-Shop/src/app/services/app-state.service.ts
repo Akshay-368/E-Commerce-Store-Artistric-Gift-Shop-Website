@@ -85,7 +85,7 @@ export function resolveSiteImageUrl(imageUrl : string | null | undefined ): stri
   // Already a full http/https URL (UnSplash/Cloudinary external) -> use as-is
   if (imageUrl.startsWith('http')) return imageUrl;
   // Relative path from backend (binary blob) -> prefix with API base
-  return'${API_BASE}${imageUrl}';
+  return `${API_BASE}${imageUrl}`;
 }
 
 // --- Loading Skeleton placeholder -------------
@@ -145,9 +145,11 @@ export class AppStateService {
     this.cartSubject = new BehaviorSubject<CartItem[]>(initialCart);
     this.cart$ = this.cartSubject.asObservable();
 
-    // Load real data from the API on boot from db.
-    this.loadProducts();
-    this.loadSiteContent();
+    
+      // Load real data from the API on boot from db.
+      this.loadProducts();
+      this.loadSiteContent();
+
   }
 
   // ── Public data loaders ────────────────────────────────────────────────

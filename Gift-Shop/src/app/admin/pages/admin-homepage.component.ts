@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HighlightCard } from '../../components/home.component';
 import { AppStateService } from '../../services/app-state.service';
 import { AdminApiService, SiteContentSummary } from '../services/admin-api.services';
 
@@ -14,29 +15,39 @@ interface SectionDef {
 
 const SECTIONS: SectionDef[] = [
   {
-    key: 'hero', label: 'Hero Section', sectionName: 'hero', hasImages: true,
+    key: 'hero', label: '🏠 Hero Section', sectionName: 'hero', hasImages: true,
     textFields: [
-      { key: 'hero.heading', label: 'Heading prefix ("Welcome to")', placeholder: 'Welcome to' },
-      { key: 'hero.subheading', label: 'Brand name (italic)', placeholder: 'Kalakaari Gifting' },
-      { key: 'hero.copy', label: 'Sub-paragraph', placeholder: 'Discover the Charm...', multiline: true },
+      { key: 'hero.badge',      label: 'Badge pill text (top of hero)',           placeholder: '✨ New arrivals every week' },
+      { key: 'hero.heading',    label: 'Heading prefix (before brand name)',       placeholder: 'Welcome to' },
+      { key: 'hero.subheading', label: 'Brand name (shown in italic)',             placeholder: 'Kalakaari Gifting' },
+      { key: 'hero.copy',       label: 'Sub-paragraph text',                       placeholder: 'Discover the Charm...', multiline: true },
     ]
   },
   {
-    key: 'manifesto', label: 'Manifesto / Our Story', sectionName: 'manifesto', hasImages: false,
+    key: 'manifesto', label: '📖 Our Story', sectionName: 'manifesto', hasImages: false,
     textFields: [
-      { key: 'manifesto.quote', label: 'Blockquote text', placeholder: 'We believe that a gift...', multiline: true },
+      { key: 'manifesto.quote', label: 'Blockquote / story text', placeholder: 'We believe that a gift...', multiline: true },
     ]
   },
   {
-    key: 'feature-1', label: 'Feature Block 1 (Crafted by Hands)', sectionName: 'feature-1', hasImages: true,
+    key: 'feature-1', label: '🎨 Feature 1 (Crafted by Hands)', sectionName: 'feature-1', hasImages: true,
     textFields: [
       { key: 'feature-1.para1', label: 'Paragraph text', placeholder: 'Unlike mass-produced...', multiline: true },
     ]
   },
   {
-    key: 'feature-2', label: 'Feature Block 2 (Unboxing Experience)', sectionName: 'feature-2', hasImages: true,
+    key: 'feature-2', label: '🎀 Feature 2 (Unboxing Experience)', sectionName: 'feature-2', hasImages: true,
     textFields: [
       { key: 'feature-2.para1', label: 'Paragraph text', placeholder: 'Presentation is half...', multiline: true },
+    ]
+  },
+  {
+    // The highlights section has no images and no simple text fields — it uses
+    // the custom card editor UI rendered below via the 'highlights' special case.
+    key: 'highlights', label: '✅ Why Choose Us', sectionName: 'highlights', hasImages: false,
+    textFields: [
+      { key: 'highlights.eyebrow', label: 'Eyebrow label above title', placeholder: 'Why Choose Us' },
+      { key: 'highlights.title',   label: 'Section heading',           placeholder: 'A Gift Boutique Like No Other' },
     ]
   },
 ];
@@ -50,7 +61,7 @@ const SECTIONS: SectionDef[] = [
       <div class="hp-header">
         <div>
           <h1 class="hp-title">Homepage Content</h1>
-          <p class="hp-sub">Manage text and images for each storefront section</p>
+          <p class="hp-sub">Manage every section of your storefront — text, images, and feature cards</p>
         </div>
         <button class="btn-secondary" (click)="loadAll()" [disabled]="loading()">
           @if (loading()) { <span class="spinner"></span> } @else { ↻ } Refresh
@@ -75,10 +86,13 @@ const SECTIONS: SectionDef[] = [
         @if (activeSection() === sec.key) {
           <div class="section-panel">
 
-            <!-- ── Images ── -->
+            <!-- ── Images (for sections that have them) ── -->
             @if (sec.hasImages) {
               <div class="panel-card">
-                <h3 class="panel-title">Section Images <span class="panel-sub">(multiple images auto-slideshow)</span></h3>
+                <h3 class="panel-title">
+                  Section Images
+                  <span class="panel-sub">(multiple images → auto-slideshow on the storefront)</span>
+                </h3>
 
                 <div class="upload-zone"
                   [class.dragover]="dragSection() === sec.key"
@@ -90,7 +104,7 @@ const SECTIONS: SectionDef[] = [
                     multiple style="display:none" (change)="onFilesSelected($event, sec)" />
                   <div class="upload-icon">📤</div>
                   <p class="upload-label">Drop images or <strong>click to browse</strong></p>
-                  <p class="upload-hint">Max 8MB · JPEG, PNG, WebP · Images slideshow automatically</p>
+                  <p class="upload-hint">Max 8MB · JPEG, PNG, WebP · Images cycle as a slideshow</p>
                 </div>
 
                 @if (uploadProgress(sec.key).length > 0) {
@@ -106,7 +120,6 @@ const SECTIONS: SectionDef[] = [
                   </div>
                 }
 
-                <!-- Existing images for this section -->
                 @if (sectionImages(sec.sectionName).length > 0) {
                   <div class="img-row">
                     @for (img of sectionImages(sec.sectionName); track img.id) {
@@ -114,56 +127,107 @@ const SECTIONS: SectionDef[] = [
                         <img [src]="imgPreviewUrl(img)" [alt]="img.altText || sec.label" class="chip-img" />
                         <div class="chip-meta">
                           <span class="chip-key">{{ img.altText || ('Image ' + (img.sortOrder + 1)) }}</span>
-                          <span class="chip-order">Sort: {{ img.sortOrder }}</span>
+                          <span class="chip-order">Sort order: {{ img.sortOrder }}</span>
                         </div>
                         <div class="chip-actions">
-                          <button class="chip-btn" title="{{ img.isActive ? 'Hide' : 'Show' }}" (click)="toggleItem(img)">
+                          <button class="chip-btn" [title]="img.isActive ? 'Hide from storefront' : 'Show on storefront'"
+                            (click)="toggleItem(img)">
                             {{ img.isActive ? '👁' : '🚫' }}
                           </button>
-                          <button class="chip-btn danger" title="Delete" (click)="deleteItem(img)">🗑️</button>
+                          <button class="chip-btn danger" title="Delete permanently" (click)="deleteItem(img)">🗑️</button>
                         </div>
                       </div>
                     }
                   </div>
                 } @else {
-                  <p class="no-content">No images uploaded yet for this section.</p>
+                  <p class="no-content">No images for this section yet. Upload one above.</p>
                 }
               </div>
             }
 
-            <!-- ── Text Content ── -->
-            <div class="panel-card">
-              <h3 class="panel-title">Text Content</h3>
+            <!-- ── Text content fields ── -->
+            @if (sec.textFields.length > 0) {
+              <div class="panel-card">
+                <h3 class="panel-title">Text Content</h3>
+                @for (tf of sec.textFields; track tf.key) {
+                  <div class="field">
+                    <label>{{ tf.label }}</label>
+                    @if (tf.multiline) {
+                      <textarea class="textarea" rows="4" [placeholder]="tf.placeholder"
+                        [(ngModel)]="textValues[tf.key]"></textarea>
+                    } @else {
+                      <input type="text" class="input" [placeholder]="tf.placeholder"
+                        [(ngModel)]="textValues[tf.key]" />
+                    }
+                    <div class="field-footer">
+                      <button class="btn-save-text" (click)="saveText(tf.key, sec.sectionName)"
+                        [disabled]="savingText[tf.key]">
+                        @if (savingText[tf.key]) { <span class="spinner-sm"></span> Saving… }
+                        @else { Save }
+                      </button>
+                      @if (savedText[tf.key]) { <span class="saved-badge">✓ Saved</span> }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
 
-              @for (tf of sec.textFields; track tf.key) {
-                <div class="field">
-                  <label>{{ tf.label }}</label>
+            <!-- ── Highlights card editor (only for highlights tab) ── -->
+            @if (sec.key === 'highlights') {
+              <div class="panel-card">
+                <h3 class="panel-title">
+                  Feature Cards
+                  <span class="panel-sub">(each card = icon emoji + title + description)</span>
+                </h3>
+                <p class="panel-desc">
+                  These cards appear in the "Why Choose Us" grid on the storefront.
+                  You can add, edit, reorder, or delete them. Changes are saved individually per card.
+                </p>
 
-                  @if (tf.multiline) {
-                    <textarea class="textarea" rows="4" [placeholder]="tf.placeholder"
-                      [(ngModel)]="textValues[tf.key]"></textarea>
-                  } @else {
-                    <input type="text" class="input" [placeholder]="tf.placeholder"
-                      [(ngModel)]="textValues[tf.key]" />
-                  }
-
-                  <button class="btn-save-text" (click)="saveText(tf.key, sec.sectionName)"
-                    [disabled]="savingText[tf.key]">
-                    @if (savingText[tf.key]) { <span class="spinner-sm"></span> Saving… }
-                    @else { Save Text }
-                  </button>
-
-                  @if (savedText[tf.key]) {
-                    <span class="saved-badge">✓ Saved</span>
+                <div class="cards-list">
+                  @for (card of highlightDrafts; track $index; let i = $index) {
+                    <div class="card-editor">
+                      <div class="card-editor-header">
+                        <span class="card-num">Card {{ i + 1 }}</span>
+                        <div class="card-editor-actions">
+                          <button class="chip-btn" title="Move up" (click)="moveCard(i, -1)" [disabled]="i === 0">↑</button>
+                          <button class="chip-btn" title="Move down" (click)="moveCard(i, 1)" [disabled]="i === highlightDrafts.length - 1">↓</button>
+                          <button class="chip-btn danger" title="Remove card" (click)="removeCard(i)">🗑️</button>
+                        </div>
+                      </div>
+                      <div class="card-fields">
+                        <div class="field-inline">
+                          <label>Icon emoji</label>
+                          <input type="text" class="input input-sm" placeholder="🎁" [(ngModel)]="card.icon" maxlength="4" />
+                        </div>
+                        <div class="field-inline flex-grow">
+                          <label>Title</label>
+                          <input type="text" class="input" placeholder="Complimentary Gift Wrapping" [(ngModel)]="card.title" />
+                        </div>
+                      </div>
+                      <div class="field">
+                        <label>Description</label>
+                        <textarea class="textarea" rows="2" placeholder="Every order arrives beautifully wrapped..."
+                          [(ngModel)]="card.body"></textarea>
+                      </div>
+                    </div>
                   }
                 </div>
-              }
-            </div>
+
+                <div class="cards-footer">
+                  <button class="btn-add-card" (click)="addCard()">+ Add Card</button>
+                  <button class="btn-primary" (click)="saveHighlights()" [disabled]="savingHighlights()">
+                    @if (savingHighlights()) { <span class="spinner-sm"></span> Saving… }
+                    @else { Save All Cards }
+                  </button>
+                  @if (savedHighlights()) { <span class="saved-badge">✓ All cards saved</span> }
+                </div>
+              </div>
+            }
 
           </div>
         }
       }
-
     </div>
   `,
   styles: [`
@@ -174,23 +238,25 @@ const SECTIONS: SectionDef[] = [
 
     .btn-secondary { background: #1c1c20; color: #c0c0c0; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
     .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #88ad35; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary:hover:not(:disabled) { background: #698927; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .alert { border-radius: 10px; padding: 11px 16px; font-size: 13px; margin-bottom: 16px; }
     .alert-error { background: rgba(224,84,84,0.08); border: 1px solid rgba(224,84,84,0.2); color: #e05454; }
 
-    /* Section tabs */
     .section-tabs { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
-    .tab { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 16px; font-size: 13px; color: #888; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+    .tab { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 15px; font-size: 12.5px; color: #888; cursor: pointer; font-family: inherit; transition: all 0.15s; }
     .tab:hover { color: #f0f0f0; border-color: rgba(255,255,255,0.15); }
     .tab.active { background: rgba(136,173,53,0.12); border-color: rgba(136,173,53,0.3); color: #88ad35; font-weight: 600; }
 
-    /* Panel */
     .section-panel { display: flex; flex-direction: column; gap: 16px; }
     .panel-card { background: #141416; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 20px; }
-    .panel-title { font-size: 14px; font-weight: 700; color: #f0f0f0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .panel-title { font-size: 14px; font-weight: 700; color: #f0f0f0; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .panel-sub { font-size: 11.5px; font-weight: 400; color: #555; }
+    .panel-desc { font-size: 12.5px; color: #666; margin-bottom: 16px; line-height: 1.5; }
 
-    /* Upload zone */
+    /* Upload */
     .upload-zone { border: 2px dashed rgba(255,255,255,0.08); border-radius: 10px; padding: 22px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 14px; }
     .upload-zone:hover, .upload-zone.dragover { border-color: #88ad35; background: rgba(136,173,53,0.04); }
     .upload-icon { font-size: 22px; margin-bottom: 6px; }
@@ -214,21 +280,38 @@ const SECTIONS: SectionDef[] = [
     .chip-order { font-size: 11px; color: #555; }
     .chip-actions { display: flex; gap: 6px; }
     .chip-btn { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 4px 7px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
-    .chip-btn:hover { background: rgba(255,255,255,0.09); }
-    .chip-btn.danger:hover { background: rgba(224,84,84,0.15); border-color: rgba(224,84,84,0.2); }
+    .chip-btn:hover:not(:disabled) { background: rgba(255,255,255,0.09); }
+    .chip-btn.danger:hover:not(:disabled) { background: rgba(224,84,84,0.15); border-color: rgba(224,84,84,0.2); }
+    .chip-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .no-content { font-size: 13px; color: #555; text-align: center; padding: 12px 0; }
 
     /* Text fields */
-    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; position: relative; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
     .field label { font-size: 12.5px; font-weight: 600; color: #888; }
-    .input { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; width: 100%; }
+    .field-footer { display: flex; align-items: center; gap: 10px; }
+    .input { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; width: 100%; box-sizing: border-box; }
     .input:focus { border-color: rgba(136,173,53,0.4); }
-    .textarea { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; width: 100%; resize: vertical; }
+    .input-sm { width: 72px; flex-shrink: 0; }
+    .textarea { background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; width: 100%; resize: vertical; box-sizing: border-box; }
     .textarea:focus { border-color: rgba(136,173,53,0.4); }
-    .btn-save-text { align-self: flex-end; background: rgba(136,173,53,0.1); border: 1px solid rgba(136,173,53,0.25); color: #88ad35; border-radius: 7px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s; font-family: inherit; }
+    .btn-save-text { background: rgba(136,173,53,0.1); border: 1px solid rgba(136,173,53,0.25); color: #88ad35; border-radius: 7px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s; font-family: inherit; }
     .btn-save-text:hover:not(:disabled) { background: rgba(136,173,53,0.18); }
     .btn-save-text:disabled { opacity: 0.5; cursor: not-allowed; }
-    .saved-badge { align-self: flex-end; font-size: 11.5px; color: #3dcf8e; font-weight: 600; }
+    .saved-badge { font-size: 11.5px; color: #3dcf8e; font-weight: 600; }
+
+    /* Highlight card editor */
+    .cards-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .card-editor { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px; }
+    .card-editor-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .card-num { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.07em; }
+    .card-editor-actions { display: flex; gap: 5px; }
+    .card-fields { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end; }
+    .field-inline { display: flex; flex-direction: column; gap: 5px; }
+    .field-inline label { font-size: 12px; font-weight: 600; color: #666; }
+    .flex-grow { flex: 1; }
+    .cards-footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .btn-add-card { background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.15); color: #888; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+    .btn-add-card:hover { border-color: #88ad35; color: #88ad35; }
 
     .spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
     .spinner-sm { width: 11px; height: 11px; border: 1.5px solid rgba(255,255,255,0.2); border-top-color: #88ad35; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
@@ -250,6 +333,11 @@ export class AdminHomepageComponent implements OnInit {
   savingText: Record<string, boolean> = {};
   savedText: Record<string, boolean> = {};
 
+  // Highlights card editor state
+  highlightDrafts: HighlightCard[] = [];
+  savingHighlights = signal(false);
+  savedHighlights = signal(false);
+
   private progMap: Record<string, { name: string; done: boolean; error?: string }[]> = {};
 
   constructor(private api: AdminApiService, private appState: AppStateService) {}
@@ -261,10 +349,30 @@ export class AdminHomepageComponent implements OnInit {
     this.api.getAllContent().subscribe({
       next: items => {
         this.allContent.set(items);
-        // Populate text field values from existing DB data
         items.filter(i => i.kind === 'Text').forEach(i => {
           this.textValues[i.contentKey] = i.textValue ?? '';
         });
+
+        // Load highlight card drafts from the saved DB items
+        const cardItems = items
+          .filter(i => i.contentKey.startsWith('highlights.card.') && i.kind === 'Text')
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+
+        if (cardItems.length > 0) {
+          this.highlightDrafts = cardItems.map(i => {
+            try { return JSON.parse(i.textValue ?? '{}') as HighlightCard; }
+            catch { return { icon: '✨', title: '', body: i.textValue ?? '' }; }
+          });
+        } else {
+          // Seed defaults into the editor (user can save when ready)
+          this.highlightDrafts = [
+            { icon: '🎁', title: 'Complimentary Gift Wrapping',    body: 'Every order arrives beautifully wrapped, ready to be gifted directly without any extra effort.' },
+            { icon: '✨', title: '100% Unique Artisan Designs',    body: 'No factory-produced duplicates. Each piece is crafted in limited numbers by real artisans.' },
+            { icon: '🚚', title: 'Fragile-Safe Nationwide Shipping', body: 'Specially packed to protect delicate handmade items during transit, delivered right to your door.' },
+            { icon: '💌', title: 'Custom Handwritten Notes',        body: 'Add a personal touch with a handwritten message card included with your order at no extra charge.' },
+          ];
+        }
+
         this.loading.set(false);
       },
       error: () => {
@@ -281,18 +389,14 @@ export class AdminHomepageComponent implements OnInit {
   }
 
   imgPreviewUrl(img: SiteContentSummary): string {
+    if (img.externalImageUrl) return img.externalImageUrl;
     return `${this.API_BASE}/api/content/${img.id}/image`;
   }
 
-  uploadProgress(sectionKey: string): { name: string; done: boolean; error?: string }[] {
-    return this.progMap[sectionKey] ?? [];
-  }
-
-  // ── Image uploads ────────────────────────────────────────────────────
+  uploadProgress(k: string) { return this.progMap[k] ?? []; }
 
   triggerFileInput(sectionKey: string) {
-    const el = document.getElementById('fi-' + sectionKey) as HTMLInputElement;
-    el?.click();
+    (document.getElementById('fi-' + sectionKey) as HTMLInputElement)?.click();
   }
 
   onFilesSelected(event: Event, sec: SectionDef) {
@@ -311,30 +415,29 @@ export class AdminHomepageComponent implements OnInit {
   doUpload(files: File[], sec: SectionDef) {
     const MAX = 8 * 1024 * 1024;
     const valid = files.filter(f => f.size <= MAX);
-    if (!valid.length) { this.globalError.set('Files exceed 8MB limit.'); return; }
+    if (!valid.length) { this.globalError.set('All files exceed 8MB limit.'); return; }
     this.globalError.set('');
 
     const progress = valid.map(f => ({ name: f.name, done: false }));
     this.progMap[sec.key] = progress;
 
-    // Calculate next sort order
-    const existingMax = this.sectionImages(sec.sectionName).reduce((m, i) => Math.max(m, i.sortOrder), -1);
+    const existingMax = this.sectionImages(sec.sectionName)
+      .reduce((m, i) => Math.max(m, i.sortOrder), -1);
 
     valid.forEach((file, idx) => {
       const sortOrder = existingMax + 1 + idx;
       const contentKey = `${sec.sectionName}.image.${sortOrder}`;
       this.api.uploadSectionImage(file, sec.sectionName, contentKey, file.name, sortOrder).subscribe({
-        next: (created) => {
+        next: () => {
           this.progMap[sec.key] = this.progMap[sec.key].map((p, i) => i === idx ? { ...p, done: true } : p);
-          // Refresh content list
           this.api.getAllContent().subscribe(items => {
             this.allContent.set(items);
-            // Propagate to public storefront
             this.appState.loadSiteContent();
           });
         },
         error: (err) => {
-          this.progMap[sec.key] = this.progMap[sec.key].map((p, i) => i === idx ? { ...p, error: err?.error?.error ?? 'Upload failed' } : p);
+          this.progMap[sec.key] = this.progMap[sec.key].map((p, i) =>
+            i === idx ? { ...p, error: err?.error?.error ?? 'Upload failed' } : p);
         }
       });
     });
@@ -362,19 +465,88 @@ export class AdminHomepageComponent implements OnInit {
   saveText(key: string, sectionName: string) {
     this.savingText[key] = true;
     this.savedText[key] = false;
-    const val = this.textValues[key] ?? '';
-    this.api.upsertTextContent(key, sectionName, val).subscribe({
+    this.api.upsertTextContent(key, sectionName, this.textValues[key] ?? '').subscribe({
       next: () => {
         this.savingText[key] = false;
         this.savedText[key] = true;
         setTimeout(() => this.savedText[key] = false, 2500);
-        // Propagate to public storefront
         this.appState.loadSiteContent();
       },
-      error: () => {
-        this.savingText[key] = false;
-        this.globalError.set('Failed to save text content.');
-      }
+      error: () => { this.savingText[key] = false; this.globalError.set('Failed to save text.'); }
     });
+  }
+
+  // ── Highlight card editor ─────────────────────────────────────────────
+
+  addCard() {
+    this.highlightDrafts = [...this.highlightDrafts, { icon: '✨', title: '', body: '' }];
+  }
+
+  removeCard(index: number) {
+    this.highlightDrafts = this.highlightDrafts.filter((_, i) => i !== index);
+  }
+
+  moveCard(index: number, direction: -1 | 1) {
+    const arr = [...this.highlightDrafts];
+    const target = index + direction;
+    if (target < 0 || target >= arr.length) return;
+    [arr[index], arr[target]] = [arr[target], arr[index]];
+    this.highlightDrafts = arr;
+  }
+
+  saveHighlights() {
+    if (this.savingHighlights()) return;
+    this.savingHighlights.set(true);
+    this.savedHighlights.set(false);
+    this.globalError.set('');
+
+    // Delete old card items from DB first, then re-insert all cards in order.
+    // This ensures any removed or reordered cards are correctly reflected.
+    const oldCardItems = this.allContent()
+      .filter(i => i.contentKey.startsWith('highlights.card.') && i.kind === 'Text');
+
+    // Build save calls for each card position
+    const saves = this.highlightDrafts.map((card, idx) =>
+      this.api.upsertTextContent(
+        `highlights.card.${idx}`,
+        'highlights',
+        JSON.stringify(card),
+        idx
+      )
+    );
+
+    // Delete cards that no longer exist (if fewer cards than before)
+    const deleteOld = oldCardItems
+      .filter(i => {
+        const num = parseInt(i.contentKey.split('.').pop() ?? '-1', 10);
+        return num >= this.highlightDrafts.length;
+      })
+      .map(i => this.api.deleteContent(i.id));
+
+    // Execute all saves sequentially (simple approach — no need for forkJoin)
+    let completed = 0;
+    const total = saves.length + deleteOld.length;
+
+    const finish = () => {
+      completed++;
+      if (completed >= total) {
+        this.savingHighlights.set(false);
+        this.savedHighlights.set(true);
+        setTimeout(() => this.savedHighlights.set(false), 2500);
+        // Reload content so the storefront picks up changes
+        this.api.getAllContent().subscribe(items => {
+          this.allContent.set(items);
+          this.appState.loadSiteContent();
+        });
+      }
+    };
+
+    if (total === 0) {
+      this.savingHighlights.set(false);
+      return;
+    }
+
+    saves.forEach(obs => obs.subscribe({ next: finish, error: finish }));
+    deleteOld.forEach(obs => obs.subscribe({ next: finish, error: finish }));
   }
 }
