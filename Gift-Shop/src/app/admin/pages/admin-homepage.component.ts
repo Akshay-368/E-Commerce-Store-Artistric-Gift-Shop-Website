@@ -161,11 +161,11 @@ const SECTIONS: SectionDef[] = [
                     }
                     <div class="field-footer">
                       <button class="btn-save-text" (click)="saveText(tf.key, sec.sectionName)"
-                        [disabled]="savingText[tf.key]">
-                        @if (savingText[tf.key]) { <span class="spinner-sm"></span> Saving… }
+                        [disabled]="savingText()[tf.key]">
+                        @if (savingText()[tf.key]) { <span class="spinner-sm"></span> Saving… }
                         @else { Save }
                       </button>
-                      @if (savedText[tf.key]) { <span class="saved-badge">✓ Saved</span> }
+                      @if (savedText()[tf.key]) { <span class="saved-badge">✓ Saved</span> }
                     </div>
                   </div>
                 }
@@ -330,8 +330,10 @@ export class AdminHomepageComponent implements OnInit {
   allContent = signal<SiteContentSummary[]>([]);
 
   textValues: Record<string, string> = {};
-  savingText: Record<string, boolean> = {};
-  savedText: Record<string, boolean> = {};
+  //savingText: Record<string, boolean> = {};
+  //savedText: Record<string, boolean> = {};
+  savingText = signal<Record<string, boolean>>({});
+  savedText = signal<Record<string, boolean>>({});
 
   // Highlights card editor state
   highlightDrafts: HighlightCard[] = [];
@@ -462,7 +464,7 @@ export class AdminHomepageComponent implements OnInit {
     });
   }
 
-  saveText(key: string, sectionName: string) {
+  /* saveText(key: string, sectionName: string) {
     this.savingText[key] = true;
     this.savedText[key] = false;
     this.api.upsertTextContent(key, sectionName, this.textValues[key] ?? '').subscribe({
@@ -472,9 +474,32 @@ export class AdminHomepageComponent implements OnInit {
         setTimeout(() => this.savedText[key] = false, 2500);
         this.appState.loadSiteContent();
       },
-      error: () => { this.savingText[key] = false; this.globalError.set('Failed to save text.'); }
+      error: () => { 
+         this.savingText[key] = false;
+         this.globalError.set('Failed to save text.'); 
+      }
     });
-  }
+  } */
+
+    saveText(key: string, sectionName: string) {
+      this.savingText.update(v => ({ ...v, [key]: true }));
+      this.savedText.update(v => ({ ...v, [key]: false }));
+
+      this.api.upsertTextContent(key, sectionName, this.textValues[key] ?? '').subscribe({
+        next: () => {
+          this.savingText.update(v => ({ ...v, [key]: false }));
+          this.savedText.update(v => ({ ...v, [key]: true }));
+          setTimeout(() => {
+            this.savedText.update(v => ({ ...v, [key]: false }));
+          }, 2500);
+          this.appState.loadSiteContent();
+        },
+        error: () => {
+          this.savingText.update(v => ({ ...v, [key]: false }));
+          this.globalError.set('Failed to save text.');
+        }
+      });
+    }
 
   // ── Highlight card editor ─────────────────────────────────────────────
 
