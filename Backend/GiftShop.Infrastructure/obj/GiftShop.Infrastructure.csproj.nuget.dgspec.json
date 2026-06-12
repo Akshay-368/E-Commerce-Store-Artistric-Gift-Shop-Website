@@ -748,6 +748,10 @@
             "Npgsql.EntityFrameworkCore.PostgreSQL": {
               "target": "Package",
               "version": "[10.0.0-preview.7, )"
+            },
+            "QuestPDF": {
+              "target": "Package",
+              "version": "[2026.6.0, )"
             }
           },
           "imports": [

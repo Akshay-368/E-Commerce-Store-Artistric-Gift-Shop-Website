@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { AppStateService } from '../services/app-state.service';
+import { Component, signal } from '@angular/core';
+import { AppStateService, CartItem } from '../services/app-state.service';
 
 @Component({
   selector: 'app-cart-drawer',
@@ -14,7 +14,7 @@ import { AppStateService } from '../services/app-state.service';
         <button class="drawer-close-btn" type="button" (click)="close()">✕</button>
       </div>
       <div class="cart-body">
-        <ng-container *ngIf="!placedOrder; else placedState">
+        <ng-container *ngIf="!placedOrder && !orderPlacedSuccess; else placedState">
           <ng-container *ngIf="items.length > 0; else emptyState">
             <div class="cart-item" *ngFor="let item of items">
               <img [src]="item.product.image" [alt]="item.product.title" class="cart-item-img" />
@@ -37,7 +37,7 @@ import { AppStateService } from '../services/app-state.service';
               <div class="form-row">
                 <div class="form-group">
                   <label>Full Name</label>
-                  <input name="name" required placeholder="Priya Sharma" />
+                  <input name="name" required placeholder="Sahil Sharma" />
                 </div>
                 <div class="form-group">
                   <label>Phone Number</label>
@@ -48,7 +48,12 @@ import { AppStateService } from '../services/app-state.service';
                   <textarea name="address" required placeholder="House no., Street, City, State, PIN"></textarea>
                 </div>
               </div>
-              <button class="btn-place-order" type="submit">🎁 Submit & Place Order</button>
+              <button class="btn-place-order" type="submit" [disabled]="submitting()">
+                {{ submitting() ? 'Placing Order...' : '🎁 Submit & Place Order' }}
+              </button>
+              @if (error()) {
+                <p class="error-msg">{{ error() }}</p>
+              }
             </form>
           </ng-container>
 
@@ -66,10 +71,10 @@ import { AppStateService } from '../services/app-state.service';
           <div class="order-placed show">
             <div class="order-placed-icon">🎉</div>
             <h4>Order Placed Successfully!</h4>
-            <p class="placed-copy">Thank you, {{ placedOrder?.customer_name }}! We've received your order.</p>
+            <p class="placed-copy">Thank you, {{ placedOrder?.customerName }}! We've received your order.</p>
             <div class="order-id-box">
               <div class="order-id-label">Your Tracking ID</div>
-              <div class="order-id-value">{{ placedOrder?.id }}</div>
+              <div class="order-id-value">{{ placedOrder?.publicOrderNumber }}</div>
               <div class="order-id-hint">Save this — you'll need it to track your order</div>
             </div>
             <div class="upi-box">
@@ -77,6 +82,7 @@ import { AppStateService } from '../services/app-state.service';
               <div class="upi-step">1. Open your UPI app (GPay, PhonePe, Paytm)</div>
               <div class="upi-step">2. Transfer <span class="upi-amount">₹{{ placedTotal.toLocaleString('en-IN') }}</span> to <strong>giftopia@upi</strong></div>
               <div class="upi-step">3. Our team will verify and ship your order within 24 hours</div>
+              <button class="btn-place-order" (click)="trackOrder()">Track Your Order</button>
             </div>
           </div>
         </ng-template>
@@ -140,19 +146,22 @@ import { AppStateService } from '../services/app-state.service';
 })
 export class CartDrawerComponent {
   open = false;
-  items: any[] = [];
+  items: CartItem[] = [];
   placedOrder: any = null;
   placedTotal = 0;
+  orderPlacedSuccess = false;
+  submitting = signal(false);
+  error = signal('');
 
   constructor(private state: AppStateService) {
-    this.state.cart$.subscribe((items) => {
+    this.state.cart$.subscribe(items => {
       this.items = items;
       this.placedTotal = items.reduce((sum, item) => sum + item.product.priceNum * item.quantity, 0);
-      if (items.length === 0 && !this.placedOrder) {
+      if (items.length === 0 && !this.orderPlacedSuccess) {
         this.open = false;
       }
     });
-    this.state.cartOpen$.subscribe((open) => {
+    this.state.cartOpen$.subscribe(open => {
       this.open = open;
     });
   }
@@ -160,7 +169,7 @@ export class CartDrawerComponent {
   close() {
     this.open = false;
     this.state.hideCart();
-    if (!this.placedOrder) {
+    if (!this.orderPlacedSuccess) {
       this.placedOrder = null;
     }
   }
@@ -180,12 +189,43 @@ export class CartDrawerComponent {
 
   placeOrder(e: Event) {
     e.preventDefault();
+    if (this.submitting()) return;
     const form = e.target as HTMLFormElement;
-    const name = (form.elements.namedItem('name') as HTMLInputElement).value;
-    const phone = (form.elements.namedItem('phone') as HTMLInputElement).value;
-    const address = (form.elements.namedItem('address') as HTMLTextAreaElement).value;
-    const order = this.state.createOrder(name, phone, address);
-    this.placedOrder = order;
-    this.placedTotal = order.items.reduce((sum, item) => sum + item.product.priceNum * item.quantity, 0);
+    const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
+    const phone = (form.elements.namedItem('phone') as HTMLInputElement).value.trim();
+    const address = (form.elements.namedItem('address') as HTMLTextAreaElement).value.trim();
+
+    if (!name || !phone || !address) {
+      this.error.set('All fields are required.');
+      return;
+    }
+
+    this.submitting.set(true);
+    this.error.set('');
+
+    this.state.createOrder(name, phone, address).subscribe({
+      next: (res) => {
+        this.submitting.set(false);
+        this.placedOrder = {
+          customerName: name,
+          publicOrderNumber: res.publicOrderNumber
+        };
+        this.orderPlacedSuccess = true;
+        // Open track modal with the new order number
+        this.state.showTrackModal(res.publicOrderNumber);
+      },
+      error: (err) => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.error || 'Failed to place order. Please try again.');
+      }
+    });
+  }
+
+  trackOrder() {
+    // Already opened via showTrackModal after placing, but provide a way to reopen
+    if (this.placedOrder?.publicOrderNumber) {
+      this.state.showTrackModal(this.placedOrder.publicOrderNumber);
+    }
+    this.close();
   }
 }

@@ -203,6 +203,10 @@ namespace GiftShop.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("TransactionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -440,10 +444,6 @@ namespace GiftShop.Infrastructure.Persistence.Migrations
 
                     b.Property<byte[]>("BinaryValue")
                         .HasColumnType("bytea");
-                    
-                    b.Property<string>("ExternalImageUrl")
-                            .HasMaxLength(700)
-                            .HasColumnType("character varying(700)");
 
                     b.Property<string>("ContentKey")
                         .IsRequired()
@@ -456,6 +456,10 @@ namespace GiftShop.Infrastructure.Persistence.Migrations
                     b.Property<string>("DisplayLocation")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ExternalImageUrl")
+                        .HasMaxLength(700)
+                        .HasColumnType("character varying(700)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");

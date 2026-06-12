@@ -32,6 +32,9 @@ public static class DependencyInjection
         // Product RAM cache — singleton so the warmed data lives for the app lifetime
         services.AddSingleton<IProductCacheService, ProductCacheService>();
 
+        // Invoice PDF Generation Service
+        services.AddScoped<IPdfInvoiceService, PdfInvoiceService>();
+
         return services;
     }
 }

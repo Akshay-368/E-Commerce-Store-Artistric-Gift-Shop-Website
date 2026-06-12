@@ -109,6 +109,9 @@ public sealed class Order : EntityBase
 
     public DateTimeOffset? DeliveredAt { get; set; }
 
+    [MaxLength(100)]
+    public string? TransactionId {get;set;}
+
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
 
     public ICollection<OrderMessage> Messages { get; set; } = new List<OrderMessage>();

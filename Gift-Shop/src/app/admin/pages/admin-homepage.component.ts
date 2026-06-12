@@ -50,6 +50,10 @@ const SECTIONS: SectionDef[] = [
       { key: 'highlights.title',   label: 'Section heading',           placeholder: 'A Gift Boutique Like No Other' },
     ]
   },
+  {
+  key: 'payment-qr', label: '💳 Payment QR', sectionName: 'payment-qr', hasImages: true,
+  textFields: []  // only images
+  },
 ];
 
 @Component({

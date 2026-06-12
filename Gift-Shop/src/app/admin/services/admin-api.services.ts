@@ -224,6 +224,53 @@ export interface SiteContentSummary {
   externalImageUrl?: string | null ;
 }
 
+// ── Order types ─────────────────────────────────────────────────────
+export interface AdminOrderListItem {
+  id: string;
+  publicOrderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  status: string;       // OrderStatus enum string
+  paymentStatus: string; // PaymentStatus enum string
+  totalAmount: number;
+  createdAt: string;
+  itemCount: number;
+}
+
+export interface AdminOrderDetail {
+  id: string;
+  publicOrderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  status: string;
+  paymentStatus: string;
+  subtotal: number;
+  shippingFee: number;
+  totalAmount: number;
+  transactionId?: string;
+  createdAt: string;
+  paidAt?: string;
+  deliveredAt?: string;
+  items: AdminOrderItem[];
+  messages: AdminOrderMessage[];
+}
+
+export interface AdminOrderItem {
+  id: string;
+  productId: string;
+  titleSnapshot: string;
+  priceSnapshot: number;
+  quantity: number;
+}
+
+export interface AdminOrderMessage {
+  id: string;
+  sender: string;
+  messageText: string;
+  createdAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
   private http = inject(HttpClient);
@@ -332,4 +379,37 @@ export class AdminApiService {
   toggleContent(id: string): Observable<{ id: string; isActive: boolean }> {
     return this.handle(this.http.put<any>(`${API}/api/admin/content/${id}/toggle`, {}, { headers: this.headers() }));
   }
+
+  // ── Order API methods ───────────────────────────────────────────────
+getOrders(page = 1, pageSize = 20, status?: string): Observable<{ total: number; items: AdminOrderListItem[] }> {
+  let params = `page=${page}&pageSize=${pageSize}`;
+  if (status) params += `&status=${status}`;
+  return this.handle(this.http.get<any>(`${API}/api/admin/orders?${params}`, { headers: this.headers() }));
+}
+
+getOrder(id: string): Observable<AdminOrderDetail> {
+  return this.handle(this.http.get<AdminOrderDetail>(`${API}/api/admin/orders/${id}`, { headers: this.headers() }));
+}
+
+updateOrderStatus(id: string, status: string): Observable<any> {
+  return this.handle(this.http.put(`${API}/api/admin/orders/${id}/status`, { status }, { headers: this.headers() }));
+}
+
+updateOrderPayment(id: string, paymentStatus: string, transactionId?: string): Observable<any> {
+  return this.handle(this.http.put(`${API}/api/admin/orders/${id}/payment`, { paymentStatus, transactionId }, { headers: this.headers() }));
+}
+
+addOrderMessage(id: string, messageText: string): Observable<AdminOrderMessage> {
+  return this.handle(this.http.post<AdminOrderMessage>(`${API}/api/admin/orders/${id}/messages`, { messageText }, { headers: this.headers() }));
+}
+
+downloadInvoice(id: string): Observable<Blob> {
+  return this.http.get(`${API}/api/admin/orders/${id}/invoice`, {
+    headers: this.headers(),
+    responseType: 'blob'
+  }).pipe(catchError(err => {
+    console.error('[AdminApi] Invoice download error', err);
+    return throwError(() => err);
+  }));
+}
 }

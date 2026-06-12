@@ -56,19 +56,35 @@ export interface CartItem {
 export interface OrderMessage {
   id: string;
   sender: string;
-  message_text: string;
-  created_at: string;
+  messageText: string;
+  createdAt: string;
 }
 
 export interface Order {
   id: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  items: CartItem[];
+  publicOrderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
   status: string;
-  created_at: string;
+  paymentStatus: string;
+  subtotal: number;
+  shippingFee: number;
+  totalAmount: number;
+  transactionId?: string;
+  createdAt: string;
+  paidAt?: string;
+  deliveredAt?: string;
+  items: OrderItem[];
   messages: OrderMessage[];
+}
+
+export interface OrderItem {
+  id: string;
+  productId: string;
+  titleSnapshot: string;
+  priceSnapshot: number;
+  quantity: number;
 }
 
 // ── Helper: Cloudinary URL optimizer (client-side belt & suspenders) ───────
@@ -131,7 +147,7 @@ export class AppStateService {
   cartOpen$ = this.cartOpenSubject.asObservable();
 
   // ── Track order modal ──────────────────────────────────────────────────
-  private trackModalSubject = new BehaviorSubject<boolean>(false);
+  private trackModalSubject = new BehaviorSubject<{ open: boolean; orderNumber?: string }>({ open: false });
   trackModal$ = this.trackModalSubject.asObservable();
 
   private orders: Order[] = [];
@@ -255,10 +271,17 @@ export class AppStateService {
 
   openCart() { this.cartOpenSubject.next(true); }
   hideCart() { this.cartOpenSubject.next(false); }
-  showTrackModal() { this.trackModalSubject.next(true); }
-  hideTrackModal() { this.trackModalSubject.next(false); }
+  /* showTrackModal() { this.trackModalSubject.next(true); }
+  hideTrackModal() { this.trackModalSubject.next(false); } */
+  showTrackModal(orderNumber?: string) {
+    this.trackModalSubject.next({ open: true, orderNumber });
+  }
 
-  createOrder(customer_name: string, customer_phone: string, customer_address: string): Order {
+  hideTrackModal() {
+    this.trackModalSubject.next({ open: false });
+  }
+
+  /* createOrder(customer_name: string, customer_phone: string, customer_address: string): Order {
     const items = this.cartSubject.value.slice();
     const currentYear : string = new Date().getFullYear().toString();
     const id = `ORD-${currentYear}-` + Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -270,16 +293,47 @@ export class AppStateService {
     this.orders.push(order);
     this.clearCart();
     return order;
+  } */
+
+     // ── Order API ────────────────────────────────────────────────────────
+  createOrder(customerName: string, customerPhone: string, customerAddress: string): Observable<{ publicOrderNumber: string }> {
+    const items = this.cartSubject.value.map(c => ({
+      productId: c.product.id,
+      quantity: c.quantity
+    }));
+    return this.http.post<{ publicOrderNumber: string }>(`${API_BASE}/api/orders`, {
+      customerName,
+      customerPhone,
+      customerAddress,
+      items
+    }).pipe(
+      tap(() => this.clearCart())
+    );
   }
 
-  findOrderById(id: string) { return this.orders.find(o => o.id === id) ?? null; }
-  findOrdersByPhone(phone: string) { return this.orders.filter(o => o.customer_phone === phone); }
+  getOrderByNumber(orderNumber: string): Observable<Order> {
+    return this.http.get<Order>(`${API_BASE}/api/orders/${orderNumber}`);
+  }
 
-  addMessage(orderId: string, sender: string, text: string) {
+  /* findOrderById(id: string) { return this.orders.find(o => o.id === id) ?? null; }
+  findOrdersByPhone(phone: string) { return this.orders.filter(o => o.customerPhone === phone); }
+ */
+
+  findOrderByPhone(phone : string) : Observable<Order[]>{
+    return this.http.get<Order[]>(`${API_BASE}/api/orders/by-phone/${phone}`);
+  }
+  /* addMessage(orderId: string, sender: string, text: string) {
     const order = this.findOrderById(orderId);
     if (!order) return null;
     const msg: OrderMessage = { id: Math.random().toString(36).slice(2, 8), sender, message_text: text, created_at: new Date().toISOString() };
     order.messages.push(msg);
     return msg;
+  } */
+
+  addOrderMessageByNumber(orderNumber: string, text: string): Observable<OrderMessage> {
+    return this.http.post<OrderMessage>(`${API_BASE}/api/orders/${orderNumber}/messages`, {
+      messageText: text
+    });
   }
+
 }
