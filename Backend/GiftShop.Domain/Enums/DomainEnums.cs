@@ -18,6 +18,13 @@ public enum PaymentStatus
     Refunded = 3
 }
 
+public enum PaymentMethod
+{
+    UPI = 0,
+    Cash = 1,
+    PayOnDelivery = 2
+}
+
 public enum SiteContentItemKind
 {
     Text = 0,

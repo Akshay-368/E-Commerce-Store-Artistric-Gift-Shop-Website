@@ -112,6 +112,9 @@ public sealed class Order : EntityBase
     [MaxLength(100)]
     public string? TransactionId {get;set;}
 
+    //  Payment method chosen by customer
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.UPI;
+
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
 
     public ICollection<OrderMessage> Messages { get; set; } = new List<OrderMessage>();

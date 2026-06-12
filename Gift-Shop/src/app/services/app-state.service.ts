@@ -296,20 +296,29 @@ export class AppStateService {
   } */
 
      // ── Order API ────────────────────────────────────────────────────────
-  createOrder(customerName: string, customerPhone: string, customerAddress: string): Observable<{ publicOrderNumber: string }> {
-    const items = this.cartSubject.value.map(c => ({
-      productId: c.product.id,
-      quantity: c.quantity
-    }));
-    return this.http.post<{ publicOrderNumber: string }>(`${API_BASE}/api/orders`, {
-      customerName,
-      customerPhone,
-      customerAddress,
-      items
-    }).pipe(
-      tap(() => this.clearCart())
-    );
-  }
+
+    createOrder(
+      customerName: string,
+      customerPhone: string,
+      customerAddress: string,
+      paymentMethod: string,
+      transactionId?: string
+    ): Observable<{ publicOrderNumber: string }> {
+      const items = this.cartSubject.value.map(c => ({
+        productId: c.product.id,
+        quantity: c.quantity
+      }));
+      return this.http.post<{ publicOrderNumber: string }>(`${API_BASE}/api/orders`, {
+        customerName,
+        customerPhone,
+        customerAddress,
+        items,
+        paymentMethod,
+        transactionId
+      }).pipe(
+        tap(() => this.clearCart())
+      );
+    }
 
   getOrderByNumber(orderNumber: string): Observable<Order> {
     return this.http.get<Order>(`${API_BASE}/api/orders/${orderNumber}`);

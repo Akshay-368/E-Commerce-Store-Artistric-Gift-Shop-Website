@@ -22,7 +22,10 @@ public sealed class PublicOrdersController : ControllerBase
         string CustomerName,
         string CustomerPhone,
         string CustomerAddress,
-        List<CreateOrderItem> Items);
+        List<CreateOrderItem> Items,
+        PaymentMethod PaymentMethod,
+        string? TransactionId = null
+        );
 
     public sealed record CreateOrderItem(Guid ProductId, int Quantity);
 
@@ -37,6 +40,10 @@ public sealed class PublicOrdersController : ControllerBase
 
         if (req.Items == null || req.Items.Count == 0)
             return BadRequest(new { error = "Order must contain at least one item." });
+        
+        // Additional validation: if UPI, transaction ID is required
+        if (req.PaymentMethod == PaymentMethod.UPI && string.IsNullOrWhiteSpace(req.TransactionId))
+            return BadRequest(new { error = "Transaction ID is required for UPI payments." });
 
         // Fetch products from DB
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();

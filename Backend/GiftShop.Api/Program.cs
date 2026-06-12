@@ -42,6 +42,8 @@ builder.Services.Configure<JsonOptions>(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     options.SerializerOptions.WriteIndented = false;
+    // Allow enums to be passed as strings (e.g. "UPI", "Verified")
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 
 // Infrastructure (DbContext, MemoryCache, Cloudinary, ProductCacheService)

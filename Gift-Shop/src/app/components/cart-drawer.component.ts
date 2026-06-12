@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, signal } from '@angular/core';
-import { AppStateService, CartItem } from '../services/app-state.service';
+import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-state.service';
 
 @Component({
   selector: 'app-cart-drawer',
@@ -32,6 +32,14 @@ import { AppStateService, CartItem } from '../services/app-state.service';
               <div class="cart-summary-row total"><span>Total</span><span>₹{{ total.toLocaleString('en-IN') }}</span></div>
             </div>
 
+            <!-- Payment QR Codes -->
+            <div class="payment-qr-section" *ngIf="paymentQrImages().length > 0">
+              <h4>Scan to pay with UPI</h4>
+              <div class="qr-gallery">
+                <img *ngFor="let img of paymentQrImages()" [src]="img" alt="Payment QR" class="qr-image" />
+              </div>
+            </div>
+
             <form class="checkout-section" (submit)="placeOrder($event)">
               <h4>Shipping Details</h4>
               <div class="form-row">
@@ -48,7 +56,34 @@ import { AppStateService, CartItem } from '../services/app-state.service';
                   <textarea name="address" required placeholder="House no., Street, City, State, PIN"></textarea>
                 </div>
               </div>
-              <button class="btn-place-order" type="submit" [disabled]="submitting()">
+
+              <!-- Payment method selection -->
+              <div class="payment-method-group">
+                <label>Payment Method *</label>
+                <div class="method-options">
+                  <label class="method-option" [class.selected]="paymentMethod() === 'UPI'">
+                    <input type="radio" name="paymentMethod" value="UPI" (change)="onMethodChange('UPI')" />
+                    <span>UPI</span>
+                  </label>
+                  <label class="method-option" [class.selected]="paymentMethod() === 'Cash'">
+                    <input type="radio" name="paymentMethod" value="Cash" (change)="onMethodChange('Cash')" />
+                    <span>Cash</span>
+                  </label>
+                  <label class="method-option" [class.selected]="paymentMethod() === 'PayOnDelivery'">
+                    <input type="radio" name="paymentMethod" value="PayOnDelivery" (change)="onMethodChange('PayOnDelivery')" />
+                    <span>Pay on Delivery</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Transaction ID (only for UPI) -->
+              <div class="form-group" *ngIf="paymentMethod() === 'UPI'">
+                <label>Transaction ID *</label>
+                <input name="transactionId" required placeholder="Enter UPI reference number" />
+              </div>
+
+              <button class="btn-place-order" type="submit"
+                [disabled]="submitting() || !paymentMethod() || (paymentMethod() === 'UPI' && !transactionId())">
                 {{ submitting() ? 'Placing Order...' : '🎁 Submit & Place Order' }}
               </button>
               @if (error()) {
@@ -89,8 +124,8 @@ import { AppStateService, CartItem } from '../services/app-state.service';
       </div>
     </aside>
   `,
-  styles: [
-    `:host{position:fixed;inset:0;pointer-events:none;z-index:900}
+  styles: [`
+    :host{position:fixed;inset:0;pointer-events:none;z-index:900}
     .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 0.3s}
     .drawer-overlay.active{opacity:1;pointer-events:auto}
     .cart{position:fixed;right:0;top:0;height:100vh;width:min(440px,100vw);background:#fff;overflow-y:auto;transform:translateX(100%);transition:transform 0.35s cubic-bezier(0.25,0.8,0.25,1);box-shadow:-12px 0 48px rgba(34,34,34,0.15);pointer-events:auto}
@@ -117,6 +152,10 @@ import { AppStateService, CartItem } from '../services/app-state.service';
     .cart-summary-row{display:flex;justify-content:space-between;padding:0.3rem 0;font-size:0.9rem}
     .cart-summary-row.total{font-weight:700;font-size:1.05rem;color:var(--color-charcoal);border-top:1px solid var(--color-border);margin-top:0.5rem;padding-top:0.7rem}
     .free{color:var(--color-primary)}
+    .payment-qr-section{margin-top:1rem;margin-bottom:1rem;padding:0.75rem;background:rgba(136,173,53,0.05);border-radius:10px}
+    .payment-qr-section h4{font-family:var(--font-ui);font-size:0.85rem;color:var(--color-charcoal);margin-bottom:0.5rem}
+    .qr-gallery{display:flex;gap:10px;flex-wrap:wrap}
+    .qr-image{width:100px;height:100px;object-fit:contain;border:1px solid var(--color-border);border-radius:8px}
     .checkout-section{margin-top:1.5rem}
     .checkout-section h4{font-family:var(--font-ui);font-size:0.9rem;font-weight:600;color:var(--color-charcoal);margin-bottom:1rem;letter-spacing:0.04em;text-transform:uppercase}
     .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem}
@@ -126,8 +165,16 @@ import { AppStateService, CartItem } from '../services/app-state.service';
     .form-group input,.form-group textarea{width:100%;padding:0.65rem 0.85rem;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.9rem;font-family:var(--font-ui);outline:none;transition:var(--transition);background:#fff}
     .form-group input:focus,.form-group textarea:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(136,173,53,0.12)}
     .form-group textarea{resize:vertical;min-height:80px}
+    .payment-method-group{margin-bottom:0.75rem}
+    .payment-method-group label{display:block;font-size:0.8rem;font-weight:500;color:var(--color-body);margin-bottom:0.4rem}
+    .method-options{display:flex;gap:0.5rem;flex-wrap:wrap}
+    .method-option{display:flex;align-items:center;gap:0.3rem;padding:0.4rem 0.8rem;border:1.5px solid var(--color-border);border-radius:8px;cursor:pointer;font-size:0.85rem;transition:background 0.15s}
+    .method-option:hover,.method-option.selected{background:rgba(136,173,53,0.08);border-color:var(--color-primary)}
+    .method-option input{accent-color:var(--color-primary)}
     .btn-place-order{width:100%;padding:1rem;background:var(--color-primary);color:#fff;border:none;border-radius:50px;font-size:1rem;font-weight:600;transition:var(--transition);margin-top:1rem;box-shadow:0 4px 16px rgba(136,173,53,0.4)}
     .btn-place-order:hover{background:var(--color-primary-d)}
+    .btn-place-order:disabled{opacity:0.5;cursor:not-allowed}
+    .error-msg{color:#ef4444;font-size:0.85rem;margin-top:0.5rem}
     .order-placed{display:none;text-align:center;padding:1.5rem 0.5rem}
     .order-placed.show{display:block}
     .order-placed-icon{font-size:3.5rem;margin-bottom:1rem}
@@ -141,8 +188,7 @@ import { AppStateService, CartItem } from '../services/app-state.service';
     .upi-step{font-size:0.875rem;color:var(--color-body);padding:0.2rem 0;display:flex;gap:0.5rem}
     .upi-amount{font-size:1.1rem;font-weight:700;color:var(--color-primary)}
     @media (max-width:900px){.form-row{grid-template-columns:1fr}}
-    `
-  ]
+  `]
 })
 export class CartDrawerComponent {
   open = false;
@@ -152,6 +198,8 @@ export class CartDrawerComponent {
   orderPlacedSuccess = false;
   submitting = signal(false);
   error = signal('');
+  paymentMethod = signal<string>('');
+  paymentQrImages = signal<string[]>([]);
 
   constructor(private state: AppStateService) {
     this.state.cart$.subscribe(items => {
@@ -163,6 +211,15 @@ export class CartDrawerComponent {
     });
     this.state.cartOpen$.subscribe(open => {
       this.open = open;
+    });
+
+    // Load payment QR images from site content
+    this.state.siteContent$.subscribe(content => {
+      const urls = content
+        .filter(i => i.sectionName === 'payment-qr' && i.kind === 'Image' && i.imageUrl)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(i => resolveSiteImageUrl(i.imageUrl!));
+      this.paymentQrImages.set(urls);
     });
   }
 
@@ -187,6 +244,15 @@ export class CartDrawerComponent {
     this.close();
   }
 
+  onMethodChange(method: string) {
+    this.paymentMethod.set(method);
+  }
+
+  transactionId() {
+    // get from form
+    return '';
+  }
+
   placeOrder(e: Event) {
     e.preventDefault();
     if (this.submitting()) return;
@@ -194,16 +260,29 @@ export class CartDrawerComponent {
     const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
     const phone = (form.elements.namedItem('phone') as HTMLInputElement).value.trim();
     const address = (form.elements.namedItem('address') as HTMLTextAreaElement).value.trim();
+    const method = this.paymentMethod();
+    let txnId: string | undefined;
+    if (method === 'UPI') {
+      txnId = (form.elements.namedItem('transactionId') as HTMLInputElement)?.value.trim();
+      if (!txnId) {
+        this.error.set('Transaction ID is required for UPI payment.');
+        return;
+      }
+    }
 
     if (!name || !phone || !address) {
       this.error.set('All fields are required.');
+      return;
+    }
+    if (!method) {
+      this.error.set('Please select a payment method.');
       return;
     }
 
     this.submitting.set(true);
     this.error.set('');
 
-    this.state.createOrder(name, phone, address).subscribe({
+    this.state.createOrder(name, phone, address, method, txnId).subscribe({
       next: (res) => {
         this.submitting.set(false);
         this.placedOrder = {
@@ -211,7 +290,6 @@ export class CartDrawerComponent {
           publicOrderNumber: res.publicOrderNumber
         };
         this.orderPlacedSuccess = true;
-        // Open track modal with the new order number
         this.state.showTrackModal(res.publicOrderNumber);
       },
       error: (err) => {
@@ -222,7 +300,6 @@ export class CartDrawerComponent {
   }
 
   trackOrder() {
-    // Already opened via showTrackModal after placing, but provide a way to reopen
     if (this.placedOrder?.publicOrderNumber) {
       this.state.showTrackModal(this.placedOrder.publicOrderNumber);
     }
