@@ -32,10 +32,17 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
                 <strong>{{ ord.publicOrderNumber }}</strong><br/>
                 {{ ord.createdAt | date:'d MMMM yyyy' }} · {{ ord.customerName }}
               </div>
-              <span class="track-status-badge" [class.status-pending]="ord.status === 'PendingPayment'" [class.status-verified]="ord.status !== 'PendingPayment'">
-                {{ ord.status }}
+              <span class="track-status-badge" [ngClass]="statusBadgeClass(ord)">
+                {{ statusLabel(ord) }}
               </span>
             </div>
+
+            <!-- Payment Failed banner -->
+            @if (ord.paymentStatus === 'Failed') {
+              <div class="payment-failed-banner">
+                ⚠️ Payment marked as <strong>Failed</strong> by the store. Please contact us to resolve this.
+              </div>
+            }
 
             <!-- Timeline -->
             <div class="track-timeline">
@@ -43,11 +50,15 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
                 <div class="track-step-dot"></div>
                 <div class="track-step-label">Order Placed</div>
               </div>
-              <div class="track-step" [class.done]="ord.status !== 'PendingPayment'">
+              <div class="track-step" [class.done]="isPaymentVerified(ord)" [class.failed]="ord.paymentStatus === 'Failed'">
                 <div class="track-step-dot"></div>
-                <div class="track-step-label">Payment Verified</div>
+                <div class="track-step-label">{{ ord.paymentStatus === 'Failed' ? 'Payment Failed' : 'Payment Verified' }}</div>
               </div>
-              <div class="track-step" [class.done]="ord.status === 'Dispatched' || ord.status === 'Delivered'">
+              <div class="track-step" [class.done]="isPacked(ord)">
+                <div class="track-step-dot"></div>
+                <div class="track-step-label">Packed</div>
+              </div>
+              <div class="track-step" [class.done]="isDispatched(ord)">
                 <div class="track-step-dot"></div>
                 <div class="track-step-label">Dispatched</div>
               </div>
@@ -57,8 +68,8 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               </div>
             </div>
 
-            <!-- Payment QR codes (if PendingPayment) -->
-            @if (ord.status === 'PendingPayment' && paymentQrImages().length > 0) {
+            <!-- Payment QR codes (if PendingPayment and payment not failed) -->
+            @if (ord.status === 'PendingPayment' && ord.paymentStatus !== 'Failed' && paymentQrImages().length > 0) {
               <div class="payment-section">
                 <h4>Complete Your Payment</h4>
                 <p>Scan any of the QR codes below with your UPI app.</p>
@@ -84,6 +95,9 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               <input #noteInput placeholder="Type a note to the owner..." (keyup.enter)="sendNote(noteInput.value); noteInput.value = ''" />
               <button class="btn-note" (click)="sendNote(noteInput.value); noteInput.value = ''">Send Note</button>
             </div>
+
+            <!-- Search again -->
+            <button class="btn-search-again" (click)="searchAgain()">← Search Another Order</button>
           </div>
         }
       </div>
@@ -111,12 +125,17 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     .track-status-badge{padding:0.3rem 0.85rem;border-radius:50px;font-size:0.78rem;font-weight:600;white-space:nowrap}
     .status-pending{background:rgba(245,158,11,0.15);color:#d97706}
     .status-verified{background:rgba(136,173,53,0.15);color:var(--color-primary-d)}
-    .track-timeline{display:flex;justify-content:space-between;margin-top:1rem;position:relative;gap:0.75rem}
-    .track-timeline::before{content:'';position:absolute;top:11px;left:10%;right:10%;height:2px;background:var(--color-border)}
+    .status-failed{background:rgba(224,84,84,0.15);color:#e05454}
+    .status-cancelled{background:rgba(100,100,100,0.15);color:#666}
+    .payment-failed-banner{background:rgba(224,84,84,0.1);border:1.5px solid rgba(224,84,84,0.35);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.86rem;color:#c0392b}
+    .track-timeline{display:flex;justify-content:space-between;margin-top:1rem;position:relative;gap:0.5rem}
+    .track-timeline::before{content:'';position:absolute;top:11px;left:8%;right:8%;height:2px;background:var(--color-border)}
     .track-step{text-align:center;position:relative;z-index:1;flex:1}
     .track-step-dot{width:22px;height:22px;border-radius:50%;background:var(--color-border);margin:0 auto 0.4rem;border:3px solid #fff;box-shadow:0 0 0 2px var(--color-border)}
     .track-step.done .track-step-dot{background:var(--color-primary);box-shadow:0 0 0 2px var(--color-primary)}
-    .track-step-label{font-size:0.72rem;color:var(--color-body);font-weight:500}
+    .track-step.failed .track-step-dot{background:#e05454;box-shadow:0 0 0 2px #e05454}
+    .track-step.failed .track-step-label{color:#e05454;font-weight:600}
+    .track-step-label{font-size:0.68rem;color:var(--color-body);font-weight:500}
     .timeline-messages{margin-top:1rem;border-top:1px solid rgba(209,209,209,0.5);padding-top:0.75rem}
     .msg{font-size:0.86rem;color:var(--color-body);padding:0.2rem 0}
     .note-row{display:flex;gap:0.6rem;margin-top:1rem}
@@ -124,12 +143,14 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     .note-row input:focus{border-color:var(--color-primary)}
     .btn-note{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1rem;border-radius:var(--radius-sm);font-weight:600;transition:var(--transition)}
     .btn-note:hover{background:var(--color-primary-d)}
+    .btn-search-again{display:inline-block;margin-top:0.75rem;background:none;border:none;color:var(--color-body);font-size:0.82rem;cursor:pointer;text-decoration:underline;padding:0}
+    .btn-search-again:hover{color:var(--color-charcoal)}
     .modal-close-btn{position:absolute;top:1.25rem;right:1.25rem;background:var(--color-bg);border:none;width:34px;height:34px;border-radius:50%;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
     .modal-close-btn:hover{background:var(--color-border)}
     .payment-section{margin:1rem 0;padding:1rem;background:rgba(136,173,53,0.06);border-radius:12px}
     .qr-gallery{display:flex;gap:10px;flex-wrap:wrap}
     .qr-image{width:120px;height:120px;object-fit:contain;border:1px solid var(--color-border);border-radius:8px}
-    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:12%;right:12%}}
+    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:10%;right:10%}}
     `
   ]
 })
@@ -152,7 +173,6 @@ export class TrackOrderModalComponent implements OnInit {
       }
     });
 
-    // Payment QR images from site content (section 'payment-qr')
     this.state.siteContent$.subscribe(items => {
       const urls = items
         .filter(i => i.sectionName === 'payment-qr' && i.kind === 'Image' && i.imageUrl)
@@ -164,6 +184,11 @@ export class TrackOrderModalComponent implements OnInit {
 
   close() {
     this.state.hideTrackModal();
+  }
+
+  searchAgain() {
+    this.order.set(null);
+    this.searchError.set('');
   }
 
   lookup(id: string, phone: string) {
@@ -207,5 +232,38 @@ export class TrackOrderModalComponent implements OnInit {
       },
       error: () => this.searchError.set('Could not send message.')
     });
+  }
+
+  // ── Status helpers ──────────────────────────────────────────────────
+
+  statusLabel(ord: Order): string {
+    if (ord.paymentStatus === 'Failed') return 'Payment Failed';
+    if (ord.status === 'Cancelled') return 'Cancelled';
+    if (ord.status === 'Delivered') return 'Delivered';
+    if (ord.status === 'Dispatched') return 'Dispatched';
+    if (ord.status === 'Packed') return 'Packed';
+    if (ord.status === 'PaymentVerified') return 'Payment Verified';
+    return 'Pending Payment';
+  }
+
+  statusBadgeClass(ord: Order): Record<string, boolean> {
+    return {
+      'status-failed': ord.paymentStatus === 'Failed',
+      'status-cancelled': ord.status === 'Cancelled',
+      'status-verified': ord.status !== 'PendingPayment' && ord.status !== 'Cancelled' && ord.paymentStatus !== 'Failed',
+      'status-pending': ord.status === 'PendingPayment' && ord.paymentStatus !== 'Failed',
+    };
+  }
+
+  isPaymentVerified(ord: Order): boolean {
+    return ['PaymentVerified', 'Packed', 'Dispatched', 'Delivered'].includes(ord.status);
+  }
+
+  isPacked(ord: Order): boolean {
+    return ['Packed', 'Dispatched', 'Delivered'].includes(ord.status);
+  }
+
+  isDispatched(ord: Order): boolean {
+    return ['Dispatched', 'Delivered'].includes(ord.status);
   }
 }

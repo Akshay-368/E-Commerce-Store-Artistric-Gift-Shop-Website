@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AdminApiService } from '../services/admin-api.services';
 import { AdminAuthService } from '../services/admin-auth.service';
 
 interface NavItem {
@@ -30,7 +31,7 @@ interface NavItem {
         </div>
 
         <nav class="sidebar-nav">
-          @for (section of navSections; track section.title) {
+          @for (section of navSections(); track section.title) {
             <div class="nav-section">
               <span class="nav-section-label">{{ section.title }}</span>
               @for (item of section.items; track item.route) {
@@ -291,54 +292,77 @@ interface NavItem {
     .admin-content::-webkit-scrollbar-thumb { background: var(--adm-surface-3); border-radius: 3px; }
   `]
 })
-export class AdminShellComponent {
+export class AdminShellComponent implements OnInit {
   sidebarCollapsed = signal(false);
+  newOrdersCount = signal<number | null>(null);
 
-  navSections = [
-    {
-      title: 'Overview',
-      items: [
-        { icon: '◈', label: 'Dashboard', route: '/admin/dashboard' },
-        { icon: '◉', label: 'Analytics', route: '/admin/analytics' },
-      ]
-    },
-    {
-      title: 'Catalog',
-      items: [
-        { icon: '⊞', label: 'Products', route: '/admin/products' },
-        { icon: '⊟', label: 'Categories', route: '/admin/categories' },
-        { icon: '⊟', label: 'Media Library', route: '/admin/media' },
-      ]
-    },
-    {
-      title: 'Content',
-      items: [
-        { icon: '⊡', label: 'Homepage', route: '/admin/homepage' },
-        { icon: '◱', label: 'Reviews', route: '/admin/reviews' },
-      ]
-    },
-    {
-      title: 'Commerce',
-      items: [
-        { icon: '◳', label: 'Orders', route: '/admin/orders', badge: '3' },
-        { icon: '◲', label: 'Payments', route: '/admin/payments' },
-        { icon: '◰', label: 'Invoices', route: '/admin/invoices' },
-        { icon: '◧', label: 'Tracking', route: '/admin/tracking' },
-      ]
-    },
-    {
-      title: 'System',
-      items: [
-        { icon: '◈', label: 'Automation', route: '/admin/automation' },
-        { icon: '◫', label: 'Settings', route: '/admin/settings' },
-        { icon: '◬', label: 'Security', route: '/admin/security' },
-      ]
-    }
-  ];
+  private api = inject(AdminApiService);
+
+  navSections = computed(() => {
+    const count = this.newOrdersCount();
+    return [
+      {
+        title: 'Overview',
+        items: [
+          { icon: '◈', label: 'Dashboard', route: '/admin/dashboard' },
+          { icon: '◉', label: 'Analytics', route: '/admin/analytics' },
+        ]
+      },
+      {
+        title: 'Catalog',
+        items: [
+          { icon: '⊞', label: 'Products', route: '/admin/products' },
+          { icon: '⊟', label: 'Categories', route: '/admin/categories' },
+          { icon: '⊟', label: 'Media Library', route: '/admin/media' },
+        ]
+      },
+      {
+        title: 'Content',
+        items: [
+          { icon: '⊡', label: 'Homepage', route: '/admin/homepage' },
+          { icon: '◱', label: 'Reviews', route: '/admin/reviews' },
+        ]
+      },
+      {
+        title: 'Commerce',
+        items: [
+          {
+            icon: '◳',
+            label: 'Orders',
+            route: '/admin/orders',
+            badge: count && count > 0 ? String(count) : undefined
+          },
+          { icon: '◲', label: 'Payments', route: '/admin/payments' },
+          { icon: '◰', label: 'Invoices', route: '/admin/invoices' },
+          { icon: '◧', label: 'Tracking', route: '/admin/tracking' },
+        ]
+      },
+      {
+        title: 'System',
+        items: [
+          { icon: '◈', label: 'Automation', route: '/admin/automation' },
+          { icon: '◫', label: 'Settings', route: '/admin/settings' },
+          { icon: '◬', label: 'Security', route: '/admin/security' },
+        ]
+      }
+    ];
+  });
 
   currentPageTitle = computed(() => 'Admin Portal');
 
   constructor(private auth: AdminAuthService, private router: Router) {}
+
+  ngOnInit() {
+    this.loadNewOrdersCount();
+  }
+
+  private loadNewOrdersCount() {
+    // Fetch only PendingPayment orders to show real new-order badge count
+    this.api.getOrders(1, 100, 'PendingPayment').subscribe({
+      next: (res) => this.newOrdersCount.set(res.total),
+      error: () => this.newOrdersCount.set(null)
+    });
+  }
 
   toggleSidebar() {
     this.sidebarCollapsed.update(v => !v);
