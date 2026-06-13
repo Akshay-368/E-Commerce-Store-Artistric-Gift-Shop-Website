@@ -81,6 +81,10 @@
               "target": "Package",
               "version": "[10.0.0, )"
             },
+            "Otp.NET": {
+              "target": "Package",
+              "version": "[1.4.0, )"
+            },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[10.1.7, )"

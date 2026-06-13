@@ -13,17 +13,18 @@ namespace GiftShop.Api.Middleware;
 public static class AdminBanRegistry
 {
     // Key = IP Address, Value = when the 24-hour ban expires (UTC)
-    public static readonly ConcurrentDictionary<string, DateTime> IpBanExpiry = new(StringComparer.OrdinalIgnoreCase);
+    public static readonly ConcurrentDictionary<string, DateTime> IpBanExpiry =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // Attempts tracker: resets on success. Key = IP, Value = (attempts, last attempt time)
     public static readonly ConcurrentDictionary<string, (int Attempts, DateTime LastAttempt)> PreAuthAttempts =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // Cooldown durations after each bad attempt (index = 0-based failed attempt count)
+    // Cooldown durations after each bad pre-auth attempt (index = 0-based failed attempt count)
     private static readonly TimeSpan[] Cooldowns =
     {
-        TimeSpan.Zero,          // after 1st fail: no cooldown
-        TimeSpan.Zero,          // after 2nd fail: no cooldown
+        TimeSpan.Zero,            // after 1st fail: no cooldown
+        TimeSpan.Zero,            // after 2nd fail: no cooldown
         TimeSpan.FromMinutes(3),  // after 3rd fail: 3 min
         TimeSpan.FromMinutes(8),  // after 4th fail: 8 min
         TimeSpan.FromMinutes(15), // after 5th fail: 15 min
@@ -95,70 +96,83 @@ public sealed class AdminIpWhitelistMiddleware
         IServiceProvider services,
         ILogger<AdminIpWhitelistMiddleware> logger)
     {
-        _next = next;
-        _options = options;
+        _next     = next;
+        _options  = options;
         _services = services;
-        _logger = logger;
+        _logger   = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var ip = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()
-                 ?? context.Connection.RemoteIpAddress?.ToString()
-                 ?? "unknown";
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-        // ── STEP 1: IP Whitelist check ───────────────────────────────────
-        var allowedIps = _options.CurrentValue.AllowedIps ?? new List<string>();
-        if (!allowedIps.Contains(ip, StringComparer.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning("[Security] Blocked admin access from non-whitelisted IP: {Ip}", ip);
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(new
-            {
-                error = "Forbidden",
-                message = "Admin Portal is restricted to authorized networks only."
-            });
-            return;
-        }
+        // ── STEP 1: IP Whitelist check — DISABLED ────────────────────────
+        // Commented out because:
+        //   a) The deployment target is a free-tier cloud host where the admin's
+        //      outbound IP is highly dynamic (VPN, mobile, ISP changes).
+        //   b) On a free-tier reverse-proxy setup, X-Forwarded-For can be trivially
+        //      spoofed, so whitelisting adds friction without meaningful security.
+        //   c) The pre-auth key + TOTP + bcrypt credential chain is sufficient for
+        //      this threat model; IP whitelisting would mainly cause random lockouts.
+        //
+        // The AllowedIps config key and Normalize() logic are intentionally left
+        // in place so this can be re-enabled in the future if the deployment
+        // moves to a static-IP or VPN-gated environment.
+        //
+        // var allowedIps = _options.CurrentValue.AllowedIps ?? new List<string>();
+        // if (!allowedIps.Contains(ip, StringComparer.OrdinalIgnoreCase))
+        // {
+        //     _logger.LogWarning("[Security] Blocked admin access from non-whitelisted IP: {Ip}", ip);
+        //     context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        //     await context.Response.WriteAsJsonAsync(new
+        //     {
+        //         error   = "Forbidden",
+        //         message = "Admin Portal is restricted to authorized networks only."
+        //     });
+        //     return;
+        // }
 
         // ── STEP 2: Check 24-hour IP ban ─────────────────────────────────
+        // Bans are written by both pre-auth failures AND TOTP failures and
+        // are shared through AdminBanRegistry, so either gate can trigger a ban.
         if (AdminBanRegistry.IsBanned(ip, out var banExpiry))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new
             {
-                error = "Locked",
+                error   = "Locked",
                 message = $"This IP is temporarily blocked due to multiple failed attempts. Try again after {banExpiry:u} UTC."
             });
             return;
         }
 
-        // ── STEP 3: Cooldown check ────────────────────────────────────────
+        // ── STEP 3: Cooldown check (pre-auth specific) ────────────────────
         if (AdminBanRegistry.IsInCooldown(ip, out var remaining))
         {
             context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            // FIX: Include retryAfterSeconds in the response body so the Angular
-            // frontend can read it and display an accurate countdown timer.
             await context.Response.WriteAsJsonAsync(new
             {
-                error = "TooManyRequests",
-                message = $"Too many failed attempts. Please wait {(int)remaining.TotalSeconds} seconds before trying again.",
+                error             = "TooManyRequests",
+                message           = $"Too many failed attempts. Please wait {(int)remaining.TotalSeconds} seconds before trying again.",
                 retryAfterSeconds = (int)Math.Ceiling(remaining.TotalSeconds)
             });
             return;
         }
 
-        // ── STEP 4: Pre-Auth Secret Key check (skip for already-authed routes) ──
-        // Routes that require valid JWT token (already have [Authorize]) don't
-        // need the pre-auth key again after login; but the login endpoint itself
-        // requires it to even see the login form.
+        // ── STEP 4: Pre-Auth Secret Key check ────────────────────────────
+        // Only enforced for the /preauth and /login endpoints.
+        // /verify-totp enforces the key check implicitly (the frontend only
+        // calls it after passing /preauth, and the same key is carried in the
+        // header for /login). We also gate /verify-totp here so a caller cannot
+        // skip straight to TOTP brute-force without first knowing the pre-auth key.
         var path = context.Request.Path.Value ?? string.Empty;
-        bool isPreAuthEndpoint = path.EndsWith("/preauth", StringComparison.OrdinalIgnoreCase);
-        bool isLoginEndpoint   = path.EndsWith("/login",   StringComparison.OrdinalIgnoreCase);
+        bool isPreAuthEndpoint  = path.EndsWith("/preauth",     StringComparison.OrdinalIgnoreCase);
+        bool isLoginEndpoint    = path.EndsWith("/login",       StringComparison.OrdinalIgnoreCase);
+        bool isVerifyTotpEndpoint = path.EndsWith("/verify-totp", StringComparison.OrdinalIgnoreCase);
 
-        if (isPreAuthEndpoint || isLoginEndpoint)
+        if (isPreAuthEndpoint || isLoginEndpoint || isVerifyTotpEndpoint)
         {
-            var clientKey = context.Request.Headers["X-Admin-PreAuth-Key"].ToString();
+            var clientKey   = context.Request.Headers["X-Admin-PreAuth-Key"].ToString();
             var expectedKey = _options.CurrentValue.SecretPreAuthKey ?? string.Empty;
 
             if (string.IsNullOrEmpty(clientKey) || clientKey != expectedKey)
@@ -168,13 +182,13 @@ public sealed class AdminIpWhitelistMiddleware
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 await context.Response.WriteAsJsonAsync(new
                 {
-                    error = "Unauthorized",
+                    error   = "Unauthorized",
                     message = "Invalid or missing pre-authentication key."
                 });
                 return;
             }
 
-            // Good key — reset attempt counter for this IP
+            // Good key — reset pre-auth attempt counter for this IP
             AdminBanRegistry.PreAuthAttempts.TryRemove(ip, out _);
         }
 
@@ -194,9 +208,8 @@ public sealed class AdminIpWhitelistMiddleware
             var banUntil = DateTime.UtcNow.AddHours(24);
             AdminBanRegistry.IpBanExpiry[ip] = banUntil;
             AdminBanRegistry.PreAuthAttempts.TryRemove(ip, out _);
-            _logger.LogWarning("[Security] IP {Ip} banned for 24 hours after {N} failed pre-auth attempts.", ip, banThreshold);
+            _logger.LogWarning("[Security] IP {Ip} banned for 24h after {N} failed pre-auth attempts.", ip, banThreshold);
 
-            // Fire-and-forget persistence to DB (write-behind pattern)
             _ = Task.Run(async () =>
             {
                 try
@@ -206,29 +219,28 @@ public sealed class AdminIpWhitelistMiddleware
                     var existing = await db.AdminAccessBans.FirstOrDefaultAsync(b => b.IpAddress == ip);
                     if (existing != null)
                     {
-                        existing.BanUntilUtc = banUntil;
+                        existing.BanUntilUtc    = banUntil;
                         existing.FailedAttempts = banThreshold;
-                        existing.LastAttemptAt = DateTimeOffset.UtcNow;
-                        existing.IsActive = true;
-                        existing.Reason = "5 failed pre-auth key attempts";
+                        existing.LastAttemptAt  = DateTimeOffset.UtcNow;
+                        existing.IsActive       = true;
+                        existing.Reason         = "5 failed pre-auth key attempts";
                     }
                     else
                     {
                         db.AdminAccessBans.Add(new GiftShop.Domain.Entities.AdminAccessBan
                         {
-                            IpAddress = ip,
+                            IpAddress      = ip,
                             FailedAttempts = banThreshold,
-                            LastAttemptAt = DateTimeOffset.UtcNow,
-                            BanUntilUtc = banUntil,
-                            IsActive = true,
-                            Reason = "5 failed pre-auth key attempts"
+                            LastAttemptAt  = DateTimeOffset.UtcNow,
+                            BanUntilUtc    = banUntil,
+                            IsActive       = true,
+                            Reason         = "5 failed pre-auth key attempts"
                         });
                     }
                     await db.SaveChangesAsync();
                 }
                 catch (Exception ex)
                 {
-                    // Log but never crash the pipeline
                     Console.Error.WriteLine($"[BanRegistry] DB write-behind failed for {ip}: {ex.Message}");
                 }
             });

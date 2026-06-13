@@ -6,8 +6,9 @@ import { catchError, tap } from 'rxjs/operators';
 
 const API = 'http://localhost:5000';
 
-// FIX: Storage key for lockout expiry timestamp (ms since epoch)
-const LOCK_KEY = '__adm_lock';
+// Storage keys
+const LOCK_KEY      = '__adm_lock';       // pre-auth cooldown expiry (ms)
+const TOTP_LOCK_KEY = '__adm_totp_lock';  // TOTP cooldown expiry (ms)
 
 export interface AdminSession {
   token: string;
@@ -17,11 +18,11 @@ export interface AdminSession {
 
 @Injectable({ providedIn: 'root' })
 export class AdminAuthService {
-  private readonly SESSION_KEY = '__adm_sess';
-  private readonly PREAUTH_KEY = '__adm_pak';
+  private readonly SESSION_KEY  = '__adm_sess';
+  private readonly PREAUTH_KEY  = '__adm_pak';
   private platformId = inject(PLATFORM_ID);
-  private isBrowser = isPlatformBrowser(this.platformId);
-  private http = inject(HttpClient);
+  private isBrowser  = isPlatformBrowser(this.platformId);
+  private http       = inject(HttpClient);
 
   isAuthenticated = signal(false);
   private preAuthKey = '';
@@ -36,7 +37,6 @@ export class AdminAuthService {
       const sess: AdminSession = JSON.parse(raw);
       if (sess.expiresAt > Date.now()) {
         this.isAuthenticated.set(true);
-        // Restore preAuthKey from sessionStorage so it survives page refresh
         this.preAuthKey = sessionStorage.getItem(this.PREAUTH_KEY) ?? '';
       } else {
         sessionStorage.removeItem(this.SESSION_KEY);
@@ -60,10 +60,7 @@ export class AdminAuthService {
 
   getPreAuthKey(): string { return this.preAuthKey; }
 
-  /**
-   * Step 1 – validate the 16-char secret key.
-   * Hits POST /api/admin/preauth with X-Admin-PreAuth-Key header.
-   */
+  // ── Stage 1: Pre-auth key ────────────────────────────────────────────
   verifyPreAuthKey(key: string): Observable<any> {
     const headers = new HttpHeaders({ 'X-Admin-PreAuth-Key': key });
     return this.http.post<any>(`${API}/api/admin/preauth`, {}, { headers }).pipe(
@@ -71,43 +68,56 @@ export class AdminAuthService {
         this.preAuthKey = key;
         if (this.isBrowser) {
           sessionStorage.setItem(this.PREAUTH_KEY, key);
-          // FIX: Clear any existing lockout on successful pre-auth
           localStorage.removeItem(LOCK_KEY);
         }
       }),
       catchError(err => {
-        // FIX: When backend returns 429 (cooldown), read the retry-after from the
-        // response body (seconds) and write the lockout expiry to localStorage
-        // so getLockoutRemaining() can return meaningful values to the UI.
         if (err?.status === 429 && this.isBrowser) {
-          const secondsRemaining: number = err?.error?.retryAfterSeconds ?? 180; // default 3 min
-          const lockUntil = Date.now() + secondsRemaining * 1000;
-          localStorage.setItem(LOCK_KEY, String(lockUntil));
+          const secs: number = err?.error?.retryAfterSeconds ?? 180;
+          localStorage.setItem(LOCK_KEY, String(Date.now() + secs * 1000));
         }
         return throwError(() => err);
       })
     );
   }
 
-  /**
-   * Step 2 – login with username + password.
-   * Requires pre-auth key to be set first.
-   */
+  // ── Stage 2: TOTP verification ───────────────────────────────────────
+  verifyTotp(code: string): Observable<any> {
+    const headers = new HttpHeaders({
+      'Content-Type':        'application/json',
+      'X-Admin-PreAuth-Key': this.preAuthKey,
+    });
+    return this.http.post<any>(`${API}/api/admin/verify-totp`, { code }, { headers }).pipe(
+      tap(() => {
+        if (this.isBrowser) localStorage.removeItem(TOTP_LOCK_KEY);
+      }),
+      catchError(err => {
+        if (err?.status === 429 && this.isBrowser) {
+          const secs: number = err?.error?.retryAfterSeconds ?? 60;
+          localStorage.setItem(TOTP_LOCK_KEY, String(Date.now() + secs * 1000));
+        }
+        return throwError(() => err);
+      })
+    );
+  }
+
+  // ── Stage 3: Username + password ─────────────────────────────────────
   login(username: string, password: string): Observable<any> {
     const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
+      'Content-Type':        'application/json',
       'X-Admin-PreAuth-Key': this.preAuthKey,
     });
     return this.http.post<any>(`${API}/api/admin/login`, { userName: username, password }, { headers }).pipe(
       tap(res => {
         const sess: AdminSession = {
-          token: res.token,
+          token:     res.token,
           expiresAt: new Date(res.expiresAt).getTime(),
           adminUser: res.displayName ?? username,
         };
         if (this.isBrowser) {
           sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(sess));
           localStorage.removeItem(LOCK_KEY);
+          localStorage.removeItem(TOTP_LOCK_KEY);
         }
         this.isAuthenticated.set(true);
       }),
@@ -123,17 +133,21 @@ export class AdminAuthService {
     this.isAuthenticated.set(false);
   }
 
-  /**
-   * Returns remaining lockout milliseconds (0 if not locked out).
-   * FIX: Now actually reads from localStorage which is populated by verifyPreAuthKey()
-   * when the backend returns a 429 response.
-   */
+  /** Returns remaining pre-auth cooldown in milliseconds (0 if not locked). */
   getLockoutRemaining(): number {
+    return this._getRemainingMs(LOCK_KEY);
+  }
+
+  /** Returns remaining TOTP cooldown in milliseconds (0 if not locked). */
+  getTotpLockoutRemaining(): number {
+    return this._getRemainingMs(TOTP_LOCK_KEY);
+  }
+
+  private _getRemainingMs(key: string): number {
     if (!this.isBrowser) return 0;
-    const lockUntil = Number(localStorage.getItem(LOCK_KEY) ?? 0);
+    const lockUntil = Number(localStorage.getItem(key) ?? 0);
     const remaining = Math.max(0, lockUntil - Date.now());
-    // Clean up expired lockout entry
-    if (remaining === 0 && lockUntil > 0) localStorage.removeItem(LOCK_KEY);
+    if (remaining === 0 && lockUntil > 0) localStorage.removeItem(key);
     return remaining;
   }
 }

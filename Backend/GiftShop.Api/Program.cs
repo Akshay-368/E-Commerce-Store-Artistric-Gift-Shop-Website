@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
+using GiftShop.Api.Services;
 
 // ── Load .env file (dev convenience; in prod, env vars take precedence) ─
 DotEnvLoader.Load();
@@ -54,6 +55,9 @@ builder.Services.Configure<JsonOptions>(options =>
 
 // Infrastructure (DbContext, MemoryCache, Cloudinary, ProductCacheService)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// TOTP verification service for the admin 3-stage login pipeline
+builder.Services.AddSingleton<IAdminTotpService, AdminTotpService>();
 
 // CORS — allow Angular dev server and production origin
 builder.Services.AddCors(options =>

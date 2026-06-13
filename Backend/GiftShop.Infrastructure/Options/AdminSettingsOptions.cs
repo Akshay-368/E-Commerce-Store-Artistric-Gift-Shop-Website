@@ -8,6 +8,14 @@ public sealed class AdminSettingsOptions
 
     public string? SecretPreAuthKey { get; set; }
 
+    /// <summary>
+    /// Base32-encoded TOTP secret. Generate once with any TOTP tool and store in
+    /// environment variable ADMINSETTINGS__TOTPSECRET (or appsettings.json for local dev).
+    /// The same value is scanned into Google Authenticator / Aegis as a manual entry.
+    /// Example (32-char Base32): JBSWY3DPEHPK3PXP
+    /// </summary>
+    public string? TotpSecret { get; set; }
+
     public string? AdminUserName { get; set; }
 
     public string? AdminPassword { get; set; }

@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdminAuthService } from '../services/admin-auth.service';
 
-type Stage = 'preauth' | 'login';
+// Three stages: pre-auth key → TOTP code → username/password
+type Stage = 'preauth' | 'totp' | 'login';
 
 @Component({
   selector: 'app-admin-login',
@@ -25,31 +26,34 @@ type Stage = 'preauth' | 'login';
           <p>Kalakaari Gifting — Internal Access Only</p>
         </div>
 
-        <!-- Stage indicator -->
+        <!-- 3-step stage indicator -->
         <div class="stage-indicator">
-          <div class="stage-step" [class.active]="stage() === 'preauth'" [class.done]="stage() === 'login'">
-            <span class="step-num">{{ stage() === 'login' ? '✓' : '1' }}</span>
+          <div class="stage-step"
+            [class.active]="stage() === 'preauth'"
+            [class.done]="stage() === 'totp' || stage() === 'login'">
+            <span class="step-num">{{ (stage() === 'totp' || stage() === 'login') ? '✓' : '1' }}</span>
             <span>Access Key</span>
           </div>
           <div class="stage-divider"></div>
+          <div class="stage-step"
+            [class.active]="stage() === 'totp'"
+            [class.done]="stage() === 'login'">
+            <span class="step-num">{{ stage() === 'login' ? '✓' : '2' }}</span>
+            <span>Authenticator</span>
+          </div>
+          <div class="stage-divider"></div>
           <div class="stage-step" [class.active]="stage() === 'login'">
-            <span class="step-num">2</span>
+            <span class="step-num">3</span>
             <span>Credentials</span>
           </div>
         </div>
 
         @if (errorMsg()) {
-          <div class="login-alert">
-            <span>⚠</span><span>{{ errorMsg() }}</span>
-          </div>
+          <div class="login-alert"><span>⚠</span><span>{{ errorMsg() }}</span></div>
         }
         @if (successMsg()) {
-          <div class="login-success">
-            <span>✓</span><span>{{ successMsg() }}</span>
-          </div>
+          <div class="login-success"><span>✓</span><span>{{ successMsg() }}</span></div>
         }
-
-        <!-- FIX: Live cooldown countdown banner -->
         @if (cooldownSecs() > 0) {
           <div class="login-cooldown">
             <span>⏳</span>
@@ -80,7 +84,6 @@ type Stage = 'preauth' | 'login';
                 </button>
               </div>
             </div>
-            <!-- FIX: Button disabled during cooldown -->
             <button class="login-btn" (click)="doPreAuth()" [disabled]="loading() || !secretKey || cooldownSecs() > 0">
               @if (loading()) { <span class="spinner"></span> Verifying… }
               @else if (cooldownSecs() > 0) { ⏳ Wait {{ formatCooldown(cooldownSecs()) }} }
@@ -89,7 +92,41 @@ type Stage = 'preauth' | 'login';
           </div>
         }
 
-        <!-- ── Stage 2: Username + Password ── -->
+        <!-- ── Stage 2: TOTP authenticator code ── -->
+        @if (stage() === 'totp') {
+          <div class="login-form">
+            <div class="field-group">
+              <label class="field-label">Authenticator Code</label>
+              <p class="field-hint">Open your authenticator app and enter the 6-digit code</p>
+              <div class="field-wrap">
+                <span class="field-icon">🔐</span>
+                <input
+                  type="text"
+                  class="field-input mono totp-input"
+                  placeholder="000000"
+                  [(ngModel)]="totpCode"
+                  [disabled]="loading() || cooldownSecs() > 0"
+                  (keydown.enter)="doVerifyTotp()"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                />
+              </div>
+              @if (cooldownSecs() > 0) {
+                <p class="field-hint warn">Wrong code — wait {{ formatCooldown(cooldownSecs()) }} before trying again.</p>
+              }
+            </div>
+            <button class="login-btn" (click)="doVerifyTotp()" [disabled]="loading() || totpCode.length < 6 || cooldownSecs() > 0">
+              @if (loading()) { <span class="spinner"></span> Verifying… }
+              @else if (cooldownSecs() > 0) { ⏳ Wait {{ formatCooldown(cooldownSecs()) }} }
+              @else { Verify Code → }
+            </button>
+            <button class="back-btn" type="button" (click)="goBack('preauth')">← Back</button>
+          </div>
+        }
+
+        <!-- ── Stage 3: Username + Password ── -->
         @if (stage() === 'login') {
           <div class="login-form">
             <div class="field-group">
@@ -117,7 +154,7 @@ type Stage = 'preauth' | 'login';
               @if (loading()) { <span class="spinner"></span> Authenticating… }
               @else { Sign In → }
             </button>
-            <button class="back-btn" type="button" (click)="stage.set('preauth')">← Back</button>
+            <button class="back-btn" type="button" (click)="goBack('totp')">← Back</button>
           </div>
         }
       </div>
@@ -131,31 +168,36 @@ type Stage = 'preauth' | 'login';
     .gradient-orb { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.25; }
     .orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, #88ad35, transparent); top: -200px; right: -100px; }
     .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, #3d8ef0, transparent); bottom: -150px; left: -100px; }
-    .login-card { position: relative; z-index: 10; background: #141416; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 36px; width: 420px; max-width: 95vw; }
+    .login-card { position: relative; z-index: 10; background: #141416; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 36px; width: 440px; max-width: 95vw; }
     .login-header { text-align: center; margin-bottom: 24px; }
     .login-brand { width: 52px; height: 52px; background: rgba(136,173,53,0.12); border: 1px solid rgba(136,173,53,0.25); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
     .brand-icon { font-size: 24px; }
     .login-header h1 { font-size: 20px; font-weight: 700; color: #f0f0f0; margin-bottom: 5px; }
     .login-header p { font-size: 13px; color: #666; }
-    .stage-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
-    .stage-step { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #555; flex: 1; }
+    /* 3-step stage indicator */
+    .stage-indicator { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+    .stage-step { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #555; flex: 1; white-space: nowrap; }
     .stage-step.active { color: #88ad35; }
     .stage-step.done { color: #3dcf8e; }
     .step-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
     .stage-step.active .step-num { background: rgba(136,173,53,0.15); border-color: #88ad35; color: #88ad35; }
     .stage-step.done .step-num { background: rgba(61,207,142,0.12); border-color: #3dcf8e; color: #3dcf8e; }
-    .stage-divider { flex: 0; height: 1px; width: 28px; background: rgba(255,255,255,0.08); }
+    .stage-divider { height: 1px; width: 16px; flex-shrink: 0; background: rgba(255,255,255,0.08); }
+    /* Alerts */
     .login-alert { display: flex; align-items: center; gap: 9px; background: rgba(224,84,84,0.1); border: 1px solid rgba(224,84,84,0.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #e05454; margin-bottom: 16px; }
     .login-success { display: flex; align-items: center; gap: 9px; background: rgba(61,207,142,0.08); border: 1px solid rgba(61,207,142,0.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #3dcf8e; margin-bottom: 16px; }
     .login-cooldown { display: flex; align-items: center; gap: 9px; background: rgba(255,165,0,0.08); border: 1px solid rgba(255,165,0,0.25); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #ffaa44; margin-bottom: 16px; }
+    /* Form */
     .login-form { display: flex; flex-direction: column; gap: 16px; }
     .field-group { display: flex; flex-direction: column; gap: 6px; }
     .field-label { font-size: 12.5px; font-weight: 600; color: #888; letter-spacing: 0.3px; }
     .field-hint { font-size: 11.5px; color: #555; }
+    .field-hint.warn { color: #ffaa44; margin-top: 4px; }
     .field-wrap { position: relative; display: flex; align-items: center; }
     .field-icon { position: absolute; left: 13px; font-size: 14px; color: #555; pointer-events: none; }
     .field-input { width: 100%; background: #1c1c20; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 11px 42px 11px 38px; font-size: 14px; color: #f0f0f0; font-family: inherit; outline: none; transition: border-color 0.15s; }
     .field-input.mono { font-family: 'Courier New', monospace; letter-spacing: 0.1em; }
+    .totp-input { text-align: center; font-size: 22px; font-weight: 700; letter-spacing: 0.35em; padding-left: 13px; }
     .field-input:focus { border-color: rgba(136,173,53,0.5); }
     .field-input:disabled { opacity: 0.5; }
     .show-pass-btn { position: absolute; right: 12px; background: none; border: none; color: #555; cursor: pointer; font-size: 14px; padding: 4px; }
@@ -169,59 +211,67 @@ type Stage = 'preauth' | 'login';
   `]
 })
 export class AdminLoginComponent implements OnDestroy {
-  stage = signal<Stage>('preauth');
-  loading = signal(false);
-  errorMsg = signal('');
-  successMsg = signal('');
-  showKey = signal(false);
-  showPass = signal(false);
-  // FIX: Reactive signal for live countdown display (in seconds)
+  stage       = signal<Stage>('preauth');
+  loading     = signal(false);
+  errorMsg    = signal('');
+  successMsg  = signal('');
+  showKey     = signal(false);
+  showPass    = signal(false);
   cooldownSecs = signal(0);
 
   secretKey = '';
-  username = '';
-  password = '';
+  totpCode  = '';
+  username  = '';
+  password  = '';
 
-  // FIX: Interval handle for live countdown ticker
   private cooldownInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(private authSvc: AdminAuthService, private router: Router) {
-    // FIX: On component init, check if we're already in a lockout (e.g. after page refresh)
-    this.updateCooldown();
+    this.syncCooldown();
   }
 
   ngOnDestroy() {
     if (this.cooldownInterval) clearInterval(this.cooldownInterval);
   }
 
-  /** Reads remaining lockout from service and starts a 1-second countdown ticker. */
-  private updateCooldown() {
-    const remaining = this.authSvc.getLockoutRemaining();
-    if (remaining > 0) {
-      this.cooldownSecs.set(Math.ceil(remaining / 1000));
+  /** Reads remaining lockout from the relevant stage and starts a 1-second tick. */
+  private syncCooldown(stage: Stage = 'preauth') {
+    const getRemainingMs = () =>
+      stage === 'totp'
+        ? this.authSvc.getTotpLockoutRemaining()
+        : this.authSvc.getLockoutRemaining();
+
+    const update = () => {
+      const secs = Math.ceil(getRemainingMs() / 1000);
+      this.cooldownSecs.set(Math.max(0, secs));
+      if (secs <= 0) {
+        if (this.cooldownInterval) { clearInterval(this.cooldownInterval); this.cooldownInterval = null; }
+        this.errorMsg.set('');
+      }
+    };
+
+    update();
+    if (this.cooldownSecs() > 0) {
       if (this.cooldownInterval) clearInterval(this.cooldownInterval);
-      this.cooldownInterval = setInterval(() => {
-        const r = this.authSvc.getLockoutRemaining();
-        const secs = Math.ceil(r / 1000);
-        this.cooldownSecs.set(secs);
-        if (secs <= 0) {
-          clearInterval(this.cooldownInterval!);
-          this.cooldownInterval = null;
-          this.errorMsg.set('');
-        }
-      }, 1000);
-    } else {
-      this.cooldownSecs.set(0);
+      this.cooldownInterval = setInterval(update, 1000);
     }
   }
 
-  /** Formats seconds into mm:ss string. */
   formatCooldown(secs: number): string {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
   }
 
+  goBack(to: Stage) {
+    this.stage.set(to);
+    this.errorMsg.set('');
+    this.successMsg.set('');
+    this.totpCode = '';
+    this.syncCooldown(to);
+  }
+
+  // ── Stage 1 ──────────────────────────────────────────────────────────
   doPreAuth() {
     if (!this.secretKey || this.loading() || this.cooldownSecs() > 0) return;
     this.loading.set(true);
@@ -229,19 +279,18 @@ export class AdminLoginComponent implements OnDestroy {
     this.authSvc.verifyPreAuthKey(this.secretKey).subscribe({
       next: () => {
         this.loading.set(false);
-        this.successMsg.set('Access key verified. Enter your credentials.');
-        this.stage.set('login');
+        this.successMsg.set('Access key verified. Enter your authenticator code.');
+        this.stage.set('totp');
+        this.syncCooldown('totp');
       },
       error: (err) => {
         this.loading.set(false);
         const status = err?.status;
-        if (status === 403) {
-          this.errorMsg.set('Your IP is not whitelisted for admin access.');
-        } else if (status === 429) {
-          // FIX: Start live countdown — service already wrote lockout to localStorage
-          this.updateCooldown();
-          const secs = err?.error?.retryAfterSeconds ?? this.cooldownSecs();
-          this.errorMsg.set(`Too many attempts. Please wait ${this.formatCooldown(secs)}.`);
+        if (status === 429) {
+          this.syncCooldown('preauth');
+          this.errorMsg.set(`Too many attempts. Please wait.`);
+        } else if (status === 403) {
+          this.errorMsg.set('Access denied from this IP.');
         } else {
           this.errorMsg.set('Invalid access key. Please check and try again.');
         }
@@ -249,6 +298,36 @@ export class AdminLoginComponent implements OnDestroy {
     });
   }
 
+  // ── Stage 2 ──────────────────────────────────────────────────────────
+  doVerifyTotp() {
+    if (this.totpCode.length < 6 || this.loading() || this.cooldownSecs() > 0) return;
+    this.loading.set(true);
+    this.errorMsg.set('');
+    this.authSvc.verifyTotp(this.totpCode).subscribe({
+      next: () => {
+        this.loading.set(false);
+        this.successMsg.set('Code verified. Enter your credentials.');
+        this.totpCode = '';
+        this.stage.set('login');
+        this.syncCooldown('login');
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.totpCode = '';
+        const status = err?.status;
+        if (status === 429) {
+          this.syncCooldown('totp');
+          this.errorMsg.set('Wrong code. Cooldown started — see timer above.');
+        } else if (status === 403) {
+          this.errorMsg.set('Your IP has been locked for 24 hours due to repeated failures.');
+        } else {
+          this.errorMsg.set(err?.error?.error ?? 'Invalid authenticator code. Try again.');
+        }
+      }
+    });
+  }
+
+  // ── Stage 3 ──────────────────────────────────────────────────────────
   doLogin() {
     if (!this.username || !this.password || this.loading()) return;
     this.loading.set(true);
@@ -262,7 +341,7 @@ export class AdminLoginComponent implements OnDestroy {
       error: (err) => {
         this.loading.set(false);
         if (err?.status === 401) this.errorMsg.set('Invalid username or password.');
-        else if (err?.status === 403) this.errorMsg.set('Access denied. IP not authorized.');
+        else if (err?.status === 403) this.errorMsg.set('Access denied.');
         else this.errorMsg.set('Login failed. Please try again.');
       }
     });
