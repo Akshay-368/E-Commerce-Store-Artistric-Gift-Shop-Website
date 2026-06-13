@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import { AppStateService } from '../services/app-state.service';
 
 @Component({
@@ -7,7 +8,7 @@ import { AppStateService } from '../services/app-state.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <header class="gs-navbar">
+    <header class="gs-navbar" *ngIf="!isAdminRoute">
       <div class="gs-container">
         <button class="brand" type="button" (click)="scrollTo('hero')">
           <img src="/assets/Artistry-Giftopia-300x300.png" alt="Kalakaari Gifting" class="logo" />
@@ -49,10 +50,14 @@ import { AppStateService } from '../services/app-state.service';
 export class NavbarComponent {
   cartCount = 0;
 
-  constructor(private state: AppStateService) {
+  constructor(private state: AppStateService, private router: Router) {
     this.state.cart$.subscribe((items) => {
       this.cartCount = items.reduce((count, item) => count + item.quantity, 0);
     });
+  }
+
+  get isAdminRoute(): boolean {
+    return this.router.url.startsWith('/admin');
   }
 
   openTrack() { this.state.showTrackModal(); }

@@ -1,8 +1,22 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, computed, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AdminBadgeComponent, AdminButtonComponent, AdminSectionComponent } from '../components/admin-ui.component';
 import { AdminApiService, AdminOrderDetail, AdminOrderListItem } from '../services/admin-api.services';
+
+// ── LocalStorage key used by both this component and admin-shell ──────
+export const SEEN_ORDERS_KEY = 'adm_seen_order_ids';
+
+export function getSeenIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SEEN_ORDERS_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+export function saveSeenIds(ids: Set<string>) {
+  try { localStorage.setItem(SEEN_ORDERS_KEY, JSON.stringify([...ids])); } catch {}
+}
 
 @Component({
   selector: 'app-admin-orders',
@@ -23,6 +37,11 @@ import { AdminApiService, AdminOrderDetail, AdminOrderListItem } from '../servic
         <adm-btn variant="secondary" [disabled]="loading()" (clicked)="loadOrders()">
           ↻ Refresh
         </adm-btn>
+        @if (unseenCount() > 0) {
+          <button class="btn-mark-all-seen" (click)="markAllSeen()">
+            ✓ Mark all {{ unseenCount() }} new as seen
+          </button>
+        }
       </div>
     </adm-section>
 
@@ -50,8 +69,13 @@ import { AdminApiService, AdminOrderDetail, AdminOrderListItem } from '../servic
           <span class="center">Actions</span>
         </div>
         @for (o of orders(); track o.id) {
-          <div class="table-row" [class.selected]="selectedOrder()?.id === o.id">
-            <span class="order-number">{{ o.publicOrderNumber }}</span>
+          <div class="table-row"
+               [class.selected]="selectedOrder()?.id === o.id"
+               [class.row-new]="isUnseen(o.id)">
+            <span class="order-number">
+              {{ o.publicOrderNumber }}
+              @if (isUnseen(o.id)) { <span class="new-dot" title="New order">●</span> }
+            </span>
             <span>{{ o.customerName }}</span>
             <span>{{ o.customerPhone }}</span>
             <span><adm-badge [label]="o.status" [color]="statusColor(o.status)"></adm-badge></span>
@@ -61,6 +85,9 @@ import { AdminApiService, AdminOrderDetail, AdminOrderListItem } from '../servic
             <span class="right">{{ o.createdAt | date:'short' }}</span>
             <span class="center actions">
               <adm-btn variant="secondary" (clicked)="viewOrder(o.id)">Details</adm-btn>
+              @if (isUnseen(o.id)) {
+                <button class="btn-seen" (click)="markSeen(o.id)" title="Mark as seen">✓</button>
+              }
             </span>
           </div>
         }
@@ -182,26 +209,54 @@ import { AdminApiService, AdminOrderDetail, AdminOrderListItem } from '../servic
     }
   `,
   styles: [`
-    /* Reuse admin dark theme variables */
     :host { display: block; color: #c0c0c0; }
-    .actions-bar { display: flex; gap: 10px; align-items: center; }
+    .actions-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .filter-select { background: #1c1c20; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; color: #f0f0f0; font-family: inherit; font-size: 13px; outline: none; }
+
+    /* Mark-all-seen button */
+    .btn-mark-all-seen {
+      background: rgba(136,173,53,0.12); border: 1px solid rgba(136,173,53,0.35);
+      color: #88ad35; border-radius: 8px; padding: 7px 14px; font-size: 12.5px;
+      font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s;
+    }
+    .btn-mark-all-seen:hover { background: rgba(136,173,53,0.22); }
+
     .alert { border-radius: 10px; padding: 11px 16px; font-size: 13px; margin-bottom: 16px; }
     .alert-error { background: rgba(224,84,84,0.08); border: 1px solid rgba(224,84,84,0.2); color: #e05454; }
     .skeleton-table { display: flex; flex-direction: column; gap: 8px; }
     .skeleton-row { height: 40px; border-radius: 6px; background: linear-gradient(90deg, #1c1c20 25%, #222226 50%, #1c1c20 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite; }
     @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     .empty-state { text-align: center; padding: 40px; color: #555; }
+
     .order-table { background: #141416; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; overflow: hidden; }
-    .table-head, .table-row { display: grid; grid-template-columns: 1.2fr 1.2fr 1fr 0.8fr 0.8fr 0.6fr 0.5fr 0.8fr 0.8fr; gap: 8px; padding: 10px 16px; align-items: center; }
+    .table-head, .table-row { display: grid; grid-template-columns: 1.4fr 1.2fr 1fr 0.8fr 0.8fr 0.6fr 0.5fr 0.8fr 0.9fr; gap: 8px; padding: 10px 16px; align-items: center; }
     .table-head { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); }
     .table-row { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.1s; }
     .table-row:hover { background: rgba(255,255,255,0.02); }
     .table-row.selected { background: rgba(136,173,53,0.06); }
+
+    /* New / unseen row highlight */
+    .table-row.row-new {
+      background: rgba(136,173,53,0.05);
+      border-left: 3px solid #88ad35;
+    }
+    .table-row.row-new:hover { background: rgba(136,173,53,0.09); }
+
     .right { text-align: right; }
     .center { text-align: center; }
-    .order-number { font-weight: 600; color: #f0f0f0; font-family: monospace; }
-    .actions { display: flex; justify-content: center; }
+    .order-number { font-weight: 600; color: #f0f0f0; font-family: monospace; display: flex; align-items: center; gap: 5px; }
+    .new-dot { color: #88ad35; font-size: 10px; line-height: 1; }
+
+    /* Per-row mark-seen button */
+    .actions { display: flex; justify-content: center; gap: 6px; align-items: center; }
+    .btn-seen {
+      background: rgba(136,173,53,0.12); border: 1px solid rgba(136,173,53,0.3);
+      color: #88ad35; border-radius: 6px; width: 26px; height: 26px;
+      font-size: 12px; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: background 0.15s; flex-shrink: 0;
+    }
+    .btn-seen:hover { background: rgba(136,173,53,0.25); }
+
     .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
     .page-info { font-size: 13px; color: #888; }
 
@@ -251,6 +306,14 @@ export class AdminOrdersComponent implements OnInit {
   selectedStatus = '';
   transactionIdInput = '';
 
+  // Tracks which order IDs the admin has acknowledged
+  private seenIds = signal<Set<string>>(getSeenIds());
+
+  unseenCount = computed(() => {
+    const seen = this.seenIds();
+    return this.orders().filter(o => !seen.has(o.id)).length;
+  });
+
   constructor(private api: AdminApiService) {}
 
   ngOnInit() { this.loadOrders(); }
@@ -263,12 +326,32 @@ export class AdminOrdersComponent implements OnInit {
         this.orders.set(res.items);
         this.total.set(res.total);
         this.loading.set(false);
+        // Refresh seen set from storage in case admin opened another tab
+        this.seenIds.set(getSeenIds());
       },
-      error: (err) => {
+      error: () => {
         this.error.set('Could not load orders.');
         this.loading.set(false);
       }
     });
+  }
+
+  isUnseen(id: string): boolean {
+    return !this.seenIds().has(id);
+  }
+
+  markSeen(id: string) {
+    const updated = new Set(this.seenIds());
+    updated.add(id);
+    saveSeenIds(updated);
+    this.seenIds.set(updated);
+  }
+
+  markAllSeen() {
+    const updated = new Set(this.seenIds());
+    this.orders().forEach(o => updated.add(o.id));
+    saveSeenIds(updated);
+    this.seenIds.set(updated);
   }
 
   changePage(delta: number) {
@@ -278,6 +361,8 @@ export class AdminOrdersComponent implements OnInit {
 
   viewOrder(id: string) {
     this.error.set('');
+    // Opening an order counts as seeing it
+    this.markSeen(id);
     this.api.getOrder(id).subscribe({
       next: (order) => this.selectedOrder.set(order),
       error: () => this.error.set('Could not load order details.')
@@ -358,22 +443,15 @@ export class AdminOrdersComponent implements OnInit {
 
   statusColor(s: string): any {
     const map: Record<string, string> = {
-      PendingPayment: 'yellow',
-      PaymentVerified: 'blue',
-      Packed: 'accent',
-      Dispatched: 'blue',
-      Delivered: 'green',
-      Cancelled: 'red'
+      PendingPayment: 'yellow', PaymentVerified: 'blue',
+      Packed: 'accent', Dispatched: 'blue', Delivered: 'green', Cancelled: 'red'
     };
     return map[s] || 'gray';
   }
 
   paymentColor(s: string): any {
     const map: Record<string, string> = {
-      Pending: 'yellow',
-      Verified: 'green',
-      Failed: 'red',
-      Refunded: 'gray'
+      Pending: 'yellow', Verified: 'green', Failed: 'red', Refunded: 'gray'
     };
     return map[s] || 'gray';
   }
