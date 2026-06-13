@@ -21,8 +21,8 @@ public enum PaymentStatus
 public enum PaymentMethod
 {
     UPI = 0,
-    Cash = 1,
-    PayOnDelivery = 2
+    Online = 1
+
 }
 
 public enum SiteContentItemKind

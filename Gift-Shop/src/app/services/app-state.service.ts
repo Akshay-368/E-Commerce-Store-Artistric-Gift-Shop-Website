@@ -150,6 +150,11 @@ export class AppStateService {
   private trackModalSubject = new BehaviorSubject<{ open: boolean; orderNumber?: string }>({ open: false });
   trackModal$ = this.trackModalSubject.asObservable();
 
+  private socialLinksSubject = new BehaviorSubject<any[]>([]);
+  socialLinks$ = this.socialLinksSubject.asObservable();
+  private paymentDetailsSubject = new BehaviorSubject<any[]>([]);
+  paymentDetails$ = this.paymentDetailsSubject.asObservable();
+
   private orders: Order[] = [];
 
   constructor(
@@ -166,6 +171,18 @@ export class AppStateService {
       this.loadProducts();
       this.loadSiteContent();
 
+  }
+  loadSocialLinks() {
+    this.http.get<any[]>(`${API_BASE}/api/social-links`).pipe(
+      tap(links => this.socialLinksSubject.next(links)),
+      catchError(() => of([]))
+    ).subscribe();
+  }
+  loadPaymentDetails() {
+    this.http.get<any[]>(`${API_BASE}/api/payment-details`).pipe(
+      tap(details => this.paymentDetailsSubject.next(details)),
+      catchError(() => of([]))
+    ).subscribe();
   }
 
   // ── Public data loaders ────────────────────────────────────────────────

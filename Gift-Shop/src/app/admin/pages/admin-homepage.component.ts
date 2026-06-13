@@ -42,8 +42,6 @@ const SECTIONS: SectionDef[] = [
     ]
   },
   {
-    // The highlights section has no images and no simple text fields — it uses
-    // the custom card editor UI rendered below via the 'highlights' special case.
     key: 'highlights', label: '✅ Why Choose Us', sectionName: 'highlights', hasImages: false,
     textFields: [
       { key: 'highlights.eyebrow', label: 'Eyebrow label above title', placeholder: 'Why Choose Us' },
@@ -51,11 +49,11 @@ const SECTIONS: SectionDef[] = [
     ]
   },
   {
-  key: 'payment-qr', label: '💳 Payment QR', sectionName: 'payment-qr', hasImages: true,
-  textFields: []  // only images
+    key: 'payment-qr', label: '💳 Payment QR', sectionName: 'payment-qr', hasImages: true,
+    textFields: []  // only images
   },
   {
-    key: 'navbar', label: '🔗 Navbar', sectionName: 'navbar', hasImages: false,
+    key: 'navbar', label: '🔗 Navbar', sectionName: 'navbar', hasImages: true,  // Now supports logo upload
     textFields: [
       { key: 'navbar.brandName',     label: 'Brand name',                       placeholder: 'Kalakaari Gifting' },
       { key: 'navbar.brandTagline',  label: 'Brand tagline (below brand name)', placeholder: 'Handmade with Love' },
@@ -74,9 +72,15 @@ const SECTIONS: SectionDef[] = [
       { key: 'footer.linkStory',        label: '"Our Story" link label',                          placeholder: 'Our Story' },
       { key: 'footer.terms',            label: 'Terms & Policies content',                        placeholder: 'Return policy: ...\nPrivacy: ...', multiline: true },
       { key: 'footer.contact.info',     label: 'Contact info (phone, email, hours)',              placeholder: '📞 +91 98765 43210\n📧 hello@kalakaari.in\n⏰ Mon-Sat 10am-6pm', multiline: true },
-      { key: 'footer.contact.socials',  label: 'Social links (JSON array)',                       placeholder: '[{"emoji":"📸","label":"Instagram","url":"https://instagram.com/..."}]', multiline: true },
-      { key: 'footer.report.email',     label: 'Report-a-problem destination email',             placeholder: 'support@kalakaari.in' },
     ]
+  },
+  {
+    key: 'social-links', label: '🌐 Social Links', sectionName: 'social-links', hasImages: false,
+    textFields: []   // custom UI for managing social links
+  },
+  {
+    key: 'payment-details', label: '💳 Payment Details', sectionName: 'payment-details', hasImages: false,
+    textFields: []   // custom UI for managing payment info
   },
 ];
 
@@ -196,7 +200,7 @@ const SECTIONS: SectionDef[] = [
                       @if (savedText()[tf.key]) { <span class="saved-badge">✓ Saved</span> }
                     </div>
                     @if (tf.key === 'footer.contact.socials') {
-                      <p class="field-hint">Format: <span class="hint-code">[ {{ '{' }}"emoji":"📸","label":"Instagram","url":"https://instagram.com/page"{{ '}' }}, ... ]</span></p>
+                      <!-- This field has been removed, no longer shown -->
                     }
                   </div>
                 }
@@ -253,6 +257,104 @@ const SECTIONS: SectionDef[] = [
                   </button>
                   @if (savedHighlights()) { <span class="saved-badge">✓ All cards saved</span> }
                 </div>
+              </div>
+            }
+
+            <!-- ── Social Links custom UI ── -->
+            @if (sec.key === 'social-links') {
+              <div class="panel-card">
+                <h3 class="panel-title">Social Links</h3>
+                <div class="field">
+                  <label>{{ editingSocialId ? 'Edit Link' : 'New Link' }}</label>
+                  <div class="card-fields">
+                    <div class="field-inline" style="width:70px">
+                      <label>Icon</label>
+                      <input type="text" class="input input-sm" [(ngModel)]="newSocial.icon" maxlength="4" />
+                    </div>
+                    <div class="field-inline flex-grow">
+                      <label>Name</label>
+                      <input type="text" class="input" [(ngModel)]="newSocial.name" placeholder="Instagram" />
+                    </div>
+                    <div class="field-inline flex-grow">
+                      <label>URL</label>
+                      <input type="text" class="input" [(ngModel)]="newSocial.url" placeholder="https://..." />
+                    </div>
+                    <button class="btn-save-text" (click)="editingSocialId ? updateSocialLink() : addSocialLink()"
+                      [disabled]="savingSocial()">
+                      {{ editingSocialId ? 'Update' : 'Add' }}
+                    </button>
+                    @if (editingSocialId) {
+                      <button class="btn-save-text" style="background: transparent; border: 1px solid #444; color: #888;"
+                        (click)="cancelEditSocial()">Cancel</button>
+                    }
+                  </div>
+                </div>
+                @if (socialLinks.length) {
+                  <div class="img-row">
+                    @for (link of socialLinks; track link.id) {
+                      <div class="img-chip" [class.inactive]="!link.isActive">
+                        <div class="chip-meta">
+                          <span class="chip-key">{{ link.icon }} {{ link.name }}</span>
+                          <span class="chip-order">{{ link.url }}</span>
+                        </div>
+                        <div class="chip-actions">
+                          <button class="chip-btn" [title]="link.isActive ? 'Hide' : 'Show'" (click)="toggleSocialLink(link.id)">
+                            {{ link.isActive ? '👁' : '🚫' }}
+                          </button>
+                          <button class="chip-btn" (click)="editSocialLink(link)">✏️</button>
+                          <button class="chip-btn danger" (click)="deleteSocialLink(link.id)">🗑️</button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                } @else { <p class="no-content">No social links added yet.</p> }
+              </div>
+            }
+
+            <!-- ── Payment Details custom UI ── -->
+            @if (sec.key === 'payment-details') {
+              <div class="panel-card">
+                <h3 class="panel-title">Payment Details</h3>
+                <div class="field">
+                  <label>{{ editingPaymentId ? 'Edit Detail' : 'New Detail' }}</label>
+                  <div class="card-fields">
+                    <div class="field-inline flex-grow">
+                      <label>Key</label>
+                      <input type="text" class="input" [(ngModel)]="newPayment.key" placeholder="Phone" />
+                    </div>
+                    <div class="field-inline flex-grow">
+                      <label>Value</label>
+                      <input type="text" class="input" [(ngModel)]="newPayment.value" placeholder="+91 98765 43210" />
+                    </div>
+                    <button class="btn-save-text" (click)="editingPaymentId ? updatePaymentDetail() : addPaymentDetail()"
+                      [disabled]="savingPayment()">
+                      {{ editingPaymentId ? 'Update' : 'Add' }}
+                    </button>
+                    @if (editingPaymentId) {
+                      <button class="btn-save-text" style="background: transparent; border: 1px solid #444; color: #888;"
+                        (click)="cancelEditPayment()">Cancel</button>
+                    }
+                  </div>
+                </div>
+                @if (paymentDetails.length) {
+                  <div class="img-row">
+                    @for (pd of paymentDetails; track pd.id) {
+                      <div class="img-chip" [class.inactive]="!pd.isActive">
+                        <div class="chip-meta">
+                          <span class="chip-key">{{ pd.key }}</span>
+                          <span class="chip-order">{{ pd.value }}</span>
+                        </div>
+                        <div class="chip-actions">
+                          <button class="chip-btn" [title]="pd.isActive ? 'Hide' : 'Show'" (click)="togglePaymentDetail(pd.id)">
+                            {{ pd.isActive ? '👁' : '🚫' }}
+                          </button>
+                          <button class="chip-btn" (click)="editPaymentDetail(pd)">✏️</button>
+                          <button class="chip-btn danger" (click)="deletePaymentDetail(pd.id)">🗑️</button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                } @else { <p class="no-content">No payment details added yet.</p> }
               </div>
             }
 
@@ -363,8 +465,6 @@ export class AdminHomepageComponent implements OnInit {
   allContent = signal<SiteContentSummary[]>([]);
 
   textValues: Record<string, string> = {};
-  //savingText: Record<string, boolean> = {};
-  //savedText: Record<string, boolean> = {};
   savingText = signal<Record<string, boolean>>({});
   savedText = signal<Record<string, boolean>>({});
 
@@ -375,9 +475,25 @@ export class AdminHomepageComponent implements OnInit {
 
   private progMap: Record<string, { name: string; done: boolean; error?: string }[]> = {};
 
+  // ── Social Links state ──
+  socialLinks: any[] = [];
+  savingSocial = signal(false);
+  newSocial = { icon: '📸', name: '', url: '' };
+  editingSocialId: string | null = null;
+
+  // ── Payment Details state ──
+  paymentDetails: any[] = [];
+  savingPayment = signal(false);
+  newPayment = { key: '', value: '' };
+  editingPaymentId: string | null = null;
+
   constructor(private api: AdminApiService, private appState: AppStateService) {}
 
-  ngOnInit() { this.loadAll(); }
+  ngOnInit() {
+    this.loadAll();
+    this.loadSocialLinks();
+    this.loadPaymentDetails();
+  }
 
   loadAll() {
     this.loading.set(true);
@@ -497,42 +613,25 @@ export class AdminHomepageComponent implements OnInit {
     });
   }
 
-  /* saveText(key: string, sectionName: string) {
-    this.savingText[key] = true;
-    this.savedText[key] = false;
+  saveText(key: string, sectionName: string) {
+    this.savingText.update(v => ({ ...v, [key]: true }));
+    this.savedText.update(v => ({ ...v, [key]: false }));
+
     this.api.upsertTextContent(key, sectionName, this.textValues[key] ?? '').subscribe({
       next: () => {
-        this.savingText[key] = false;
-        this.savedText[key] = true;
-        setTimeout(() => this.savedText[key] = false, 2500);
+        this.savingText.update(v => ({ ...v, [key]: false }));
+        this.savedText.update(v => ({ ...v, [key]: true }));
+        setTimeout(() => {
+          this.savedText.update(v => ({ ...v, [key]: false }));
+        }, 2500);
         this.appState.loadSiteContent();
       },
-      error: () => { 
-         this.savingText[key] = false;
-         this.globalError.set('Failed to save text.'); 
+      error: () => {
+        this.savingText.update(v => ({ ...v, [key]: false }));
+        this.globalError.set('Failed to save text.');
       }
     });
-  } */
-
-    saveText(key: string, sectionName: string) {
-      this.savingText.update(v => ({ ...v, [key]: true }));
-      this.savedText.update(v => ({ ...v, [key]: false }));
-
-      this.api.upsertTextContent(key, sectionName, this.textValues[key] ?? '').subscribe({
-        next: () => {
-          this.savingText.update(v => ({ ...v, [key]: false }));
-          this.savedText.update(v => ({ ...v, [key]: true }));
-          setTimeout(() => {
-            this.savedText.update(v => ({ ...v, [key]: false }));
-          }, 2500);
-          this.appState.loadSiteContent();
-        },
-        error: () => {
-          this.savingText.update(v => ({ ...v, [key]: false }));
-          this.globalError.set('Failed to save text.');
-        }
-      });
-    }
+  }
 
   // ── Highlight card editor ─────────────────────────────────────────────
 
@@ -558,12 +657,9 @@ export class AdminHomepageComponent implements OnInit {
     this.savedHighlights.set(false);
     this.globalError.set('');
 
-    // Delete old card items from DB first, then re-insert all cards in order.
-    // This ensures any removed or reordered cards are correctly reflected.
     const oldCardItems = this.allContent()
       .filter(i => i.contentKey.startsWith('highlights.card.') && i.kind === 'Text');
 
-    // Build save calls for each card position
     const saves = this.highlightDrafts.map((card, idx) =>
       this.api.upsertTextContent(
         `highlights.card.${idx}`,
@@ -573,7 +669,6 @@ export class AdminHomepageComponent implements OnInit {
       )
     );
 
-    // Delete cards that no longer exist (if fewer cards than before)
     const deleteOld = oldCardItems
       .filter(i => {
         const num = parseInt(i.contentKey.split('.').pop() ?? '-1', 10);
@@ -581,7 +676,6 @@ export class AdminHomepageComponent implements OnInit {
       })
       .map(i => this.api.deleteContent(i.id));
 
-    // Execute all saves sequentially (simple approach — no need for forkJoin)
     let completed = 0;
     const total = saves.length + deleteOld.length;
 
@@ -591,7 +685,6 @@ export class AdminHomepageComponent implements OnInit {
         this.savingHighlights.set(false);
         this.savedHighlights.set(true);
         setTimeout(() => this.savedHighlights.set(false), 2500);
-        // Reload content so the storefront picks up changes
         this.api.getAllContent().subscribe(items => {
           this.allContent.set(items);
           this.appState.loadSiteContent();
@@ -606,5 +699,151 @@ export class AdminHomepageComponent implements OnInit {
 
     saves.forEach(obs => obs.subscribe({ next: finish, error: finish }));
     deleteOld.forEach(obs => obs.subscribe({ next: finish, error: finish }));
+  }
+
+  // ── Social Links CRUD ────────────────────────────────────────────────
+
+  loadSocialLinks() {
+    this.api.getSocialLinks().subscribe({
+      next: links => this.socialLinks = links,
+      error: () => this.globalError.set('Failed to load social links.')
+    });
+  }
+
+  addSocialLink() {
+    if (!this.newSocial.name || !this.newSocial.url) return;
+    this.savingSocial.set(true);
+    this.api.createSocialLink(this.newSocial.icon, this.newSocial.name, this.newSocial.url).subscribe({
+      next: () => {
+        this.loadSocialLinks();
+        this.newSocial = { icon: '📸', name: '', url: '' };
+        this.savingSocial.set(false);
+        this.appState.loadSiteContent();
+      },
+      error: () => {
+        this.savingSocial.set(false);
+        this.globalError.set('Failed to add social link.');
+      }
+    });
+  }
+
+  editSocialLink(link: any) {
+    this.editingSocialId = link.id;
+    this.newSocial = { icon: link.icon, name: link.name, url: link.url };
+  }
+
+  cancelEditSocial() {
+    this.editingSocialId = null;
+    this.newSocial = { icon: '📸', name: '', url: '' };
+  }
+
+  updateSocialLink() {
+    if (!this.editingSocialId || !this.newSocial.name || !this.newSocial.url) return;
+    this.savingSocial.set(true);
+    this.api.updateSocialLink(this.editingSocialId, this.newSocial).subscribe({
+      next: () => {
+        this.loadSocialLinks();
+        this.cancelEditSocial();
+        this.savingSocial.set(false);
+        this.appState.loadSiteContent();
+      },
+      error: () => {
+        this.savingSocial.set(false);
+        this.globalError.set('Failed to update social link.');
+      }
+    });
+  }
+
+  deleteSocialLink(id: string) {
+    this.api.deleteSocialLink(id).subscribe({
+      next: () => {
+        this.loadSocialLinks();
+        this.appState.loadSiteContent();
+      },
+      error: () => this.globalError.set('Failed to delete social link.')
+    });
+  }
+
+  toggleSocialLink(id: string) {
+    this.api.toggleSocialLink(id).subscribe({
+      next: () => {
+        this.loadSocialLinks();
+        this.appState.loadSiteContent();
+      },
+      error: () => this.globalError.set('Failed to toggle social link.')
+    });
+  }
+
+  // ── Payment Details CRUD ─────────────────────────────────────────────
+
+  loadPaymentDetails() {
+    this.api.getPaymentDetails().subscribe({
+      next: details => this.paymentDetails = details,
+      error: () => this.globalError.set('Failed to load payment details.')
+    });
+  }
+
+  addPaymentDetail() {
+    if (!this.newPayment.key || !this.newPayment.value) return;
+    this.savingPayment.set(true);
+    this.api.createPaymentDetail(this.newPayment.key, this.newPayment.value).subscribe({
+      next: () => {
+        this.loadPaymentDetails();
+        this.newPayment = { key: '', value: '' };
+        this.savingPayment.set(false);
+        this.appState.loadSiteContent();
+      },
+      error: () => {
+        this.savingPayment.set(false);
+        this.globalError.set('Failed to add payment detail.');
+      }
+    });
+  }
+
+  editPaymentDetail(pd: any) {
+    this.editingPaymentId = pd.id;
+    this.newPayment = { key: pd.key, value: pd.value };
+  }
+
+  cancelEditPayment() {
+    this.editingPaymentId = null;
+    this.newPayment = { key: '', value: '' };
+  }
+
+  updatePaymentDetail() {
+    if (!this.editingPaymentId || !this.newPayment.key || !this.newPayment.value) return;
+    this.savingPayment.set(true);
+    this.api.updatePaymentDetail(this.editingPaymentId, this.newPayment).subscribe({
+      next: () => {
+        this.loadPaymentDetails();
+        this.cancelEditPayment();
+        this.savingPayment.set(false);
+        this.appState.loadSiteContent();
+      },
+      error: () => {
+        this.savingPayment.set(false);
+        this.globalError.set('Failed to update payment detail.');
+      }
+    });
+  }
+
+  deletePaymentDetail(id: string) {
+    this.api.deletePaymentDetail(id).subscribe({
+      next: () => {
+        this.loadPaymentDetails();
+        this.appState.loadSiteContent();
+      },
+      error: () => this.globalError.set('Failed to delete payment detail.')
+    });
+  }
+
+  togglePaymentDetail(id: string) {
+    this.api.togglePaymentDetail(id).subscribe({
+      next: () => {
+        this.loadPaymentDetails();
+        this.appState.loadSiteContent();
+      },
+      error: () => this.globalError.set('Failed to toggle payment detail.')
+    });
   }
 }

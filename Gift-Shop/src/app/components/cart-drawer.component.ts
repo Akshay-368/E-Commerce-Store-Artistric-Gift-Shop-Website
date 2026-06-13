@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-state.service';
 
 @Component({
   selector: 'app-cart-drawer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="drawer-overlay" [class.active]="open" (click)="close()"></div>
     <aside id="cart-drawer" class="cart" [class.open]="open">
@@ -57,6 +58,16 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
             </div>
           </div>
 
+          <!-- Payment Details (from admin) -->
+          <div class="payment-details-section" *ngIf="paymentDetails().length > 0">
+            <h4>Payment Information</h4>
+            <ul>
+              <li *ngFor="let pd of paymentDetails()">
+                <strong>{{ pd.key }}:</strong> {{ pd.value }}
+              </li>
+            </ul>
+          </div>
+
           <form class="checkout-section" (submit)="placeOrder($event)">
             <h4>Shipping Details</h4>
             <div class="form-row">
@@ -74,7 +85,7 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
               </div>
             </div>
 
-            <!-- Payment method selection -->
+            <!-- Payment method selection – only UPI and Online -->
             <div class="payment-method-group">
               <label>Payment Method *</label>
               <div class="method-options">
@@ -82,21 +93,23 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
                   <input type="radio" name="paymentMethod" value="UPI" (change)="onMethodChange('UPI')" />
                   <span>UPI</span>
                 </label>
-                <label class="method-option" [class.selected]="paymentMethod() === 'Cash'">
-                  <input type="radio" name="paymentMethod" value="Cash" (change)="onMethodChange('Cash')" />
-                  <span>Cash</span>
-                </label>
-                <label class="method-option" [class.selected]="paymentMethod() === 'PayOnDelivery'">
-                  <input type="radio" name="paymentMethod" value="PayOnDelivery" (change)="onMethodChange('PayOnDelivery')" />
-                  <span>Pay on Delivery</span>
+                <label class="method-option" [class.selected]="paymentMethod() === 'Online'">
+                  <input type="radio" name="paymentMethod" value="Online" (change)="onMethodChange('Online')" />
+                  <span>Online Payment</span>
                 </label>
               </div>
             </div>
 
-            <!-- Transaction ID (only for UPI) -->
+            <!-- Transaction ID input only when UPI is selected -->
             <div class="form-group" *ngIf="paymentMethod() === 'UPI'">
               <label>Transaction ID *</label>
-              <input name="transactionId" required placeholder="Enter UPI reference number" />
+              <input name="transactionId" required placeholder="Enter UPI reference number"
+                     [(ngModel)]="transactionId" />
+            </div>
+
+            <!-- Optional note for Online payment -->
+            <div class="form-group" *ngIf="paymentMethod() === 'Online'">
+              <p class="online-note">You'll be redirected to a secure payment page after placing your order.</p>
             </div>
 
             <button class="btn-place-order" type="submit"
@@ -164,6 +177,11 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
     .payment-qr-section h4{font-family:var(--font-ui);font-size:0.85rem;color:var(--color-charcoal);margin-bottom:0.5rem}
     .qr-gallery{display:flex;gap:10px;flex-wrap:wrap}
     .qr-image{width:100px;height:100px;object-fit:contain;border:1px solid var(--color-border);border-radius:8px}
+    .payment-details-section{margin-top:1rem;margin-bottom:1rem;padding:0.75rem;background:rgba(136,173,53,0.05);border-radius:10px}
+    .payment-details-section h4{font-family:var(--font-ui);font-size:0.85rem;color:var(--color-charcoal);margin-bottom:0.5rem}
+    .payment-details-section ul{list-style:none;padding:0;margin:0}
+    .payment-details-section li{font-size:0.82rem;color:var(--color-body);padding:0.25rem 0;border-bottom:1px solid rgba(0,0,0,0.04)}
+    .online-note{font-size:0.82rem;color:var(--color-body);margin-top:0.25rem}
     .checkout-section{margin-top:1.5rem}
     .checkout-section h4{font-family:var(--font-ui);font-size:0.9rem;font-weight:600;color:var(--color-charcoal);margin-bottom:1rem;letter-spacing:0.04em;text-transform:uppercase}
     .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem}
@@ -196,12 +214,13 @@ export class CartDrawerComponent {
   error = signal('');
   paymentMethod = signal<string>('');
   paymentQrImages = signal<string[]>([]);
+  paymentDetails = signal<any[]>([]);
+  transactionId = signal('');
 
   constructor(private state: AppStateService) {
     this.state.cart$.subscribe(items => {
       this.items = items;
       this.placedTotal = items.reduce((sum, item) => sum + item.product.priceNum * item.quantity, 0);
-      // Do NOT auto-close when cart is empty — user may have just placed an order
       if (items.length === 0 && !this.orderPlacedSuccess) {
         this.open = false;
       }
@@ -210,12 +229,18 @@ export class CartDrawerComponent {
       this.open = open;
     });
 
+    // Payment QR images
     this.state.siteContent$.subscribe(content => {
       const urls = content
         .filter(i => i.sectionName === 'payment-qr' && i.kind === 'Image' && i.imageUrl)
         .sort((a, b) => a.sortOrder - b.sortOrder)
         .map(i => resolveSiteImageUrl(i.imageUrl!));
       this.paymentQrImages.set(urls);
+    });
+
+    // Payment details (new) – loaded from AppStateService
+    this.state.paymentDetails$.subscribe(details => {
+      this.paymentDetails.set(details);
     });
   }
 
@@ -224,7 +249,6 @@ export class CartDrawerComponent {
     this.state.hideCart();
   }
 
-  /** User explicitly dismisses the success banner — they can still see the cart */
   dismissBanner() {
     this.orderPlacedSuccess = false;
     this.placedOrder = null;
@@ -245,10 +269,8 @@ export class CartDrawerComponent {
 
   onMethodChange(method: string) {
     this.paymentMethod.set(method);
-  }
-
-  transactionId() {
-    return '';
+    // Clear transaction ID when switching methods
+    this.transactionId.set('');
   }
 
   placeOrder(e: Event) {
@@ -260,20 +282,23 @@ export class CartDrawerComponent {
     const address = (form.elements.namedItem('address') as HTMLTextAreaElement).value.trim();
     const method = this.paymentMethod();
     let txnId: string | undefined;
+
     if (method === 'UPI') {
-      txnId = (form.elements.namedItem('transactionId') as HTMLInputElement)?.value.trim();
+      txnId = this.transactionId().trim();
       if (!txnId) {
         this.error.set('Transaction ID is required for UPI payment.');
         return;
       }
+    } else if (method === 'Online') {
+      // No transaction ID needed; optionally leave undefined
+      txnId = undefined;
+    } else {
+      this.error.set('Please select a payment method.');
+      return;
     }
 
     if (!name || !phone || !address) {
       this.error.set('All fields are required.');
-      return;
-    }
-    if (!method) {
-      this.error.set('Please select a payment method.');
       return;
     }
 
@@ -288,8 +313,8 @@ export class CartDrawerComponent {
           publicOrderNumber: res.publicOrderNumber
         };
         this.orderPlacedSuccess = true;
-        // Reset payment method so form feels fresh for a potential next order
         this.paymentMethod.set('');
+        this.transactionId.set('');
         form.reset();
         this.state.showTrackModal(res.publicOrderNumber);
       },

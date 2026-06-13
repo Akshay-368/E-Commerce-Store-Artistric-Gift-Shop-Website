@@ -25,7 +25,7 @@ public sealed class PublicOrdersController : ControllerBase
         List<CreateOrderItem> Items,
         PaymentMethod PaymentMethod,
         string? TransactionId = null
-        );
+    );
 
     public sealed record CreateOrderItem(Guid ProductId, int Quantity);
 
@@ -41,7 +41,10 @@ public sealed class PublicOrdersController : ControllerBase
         if (req.Items == null || req.Items.Count == 0)
             return BadRequest(new { error = "Order must contain at least one item." });
         
+        // Additional validation: only UPI or Online allowed
         // Additional validation: if UPI, transaction ID is required
+        if (req.PaymentMethod != PaymentMethod.UPI && req.PaymentMethod != PaymentMethod.Online)
+            return BadRequest(new { error = "Payment method must be UPI or Online." });
         if (req.PaymentMethod == PaymentMethod.UPI && string.IsNullOrWhiteSpace(req.TransactionId))
             return BadRequest(new { error = "Transaction ID is required for UPI payments." });
 

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { AppStateService } from '../services/app-state.service';
+import { AppStateService, resolveSiteImageUrl } from '../services/app-state.service';
 
 @Component({
   selector: 'app-navbar',
@@ -11,7 +11,7 @@ import { AppStateService } from '../services/app-state.service';
     <header class="gs-navbar" *ngIf="!isAdminRoute">
       <div class="gs-container">
         <button class="brand" type="button" (click)="scrollTo('hero')">
-          <img src="/assets/Artistry-Giftopia-300x300.png" [alt]="brandName" class="logo" />
+          <img [src]="logoSrc" [alt]="brandName" class="logo" />
           <span>
             <span class="brand-name">{{ brandName }}</span>
             <span class="brand-tagline">{{ brandTagline }}</span>
@@ -55,6 +55,9 @@ export class NavbarComponent implements OnInit {
   browseCatalogLabel = 'Browse Catalog';
   orderBagLabel = '🛍️ Order Bag';
 
+  // Dynamic logo source
+  logoSrc = '/assets/Artistry-Giftopia-300x300.png'; // fallback
+
   constructor(private state: AppStateService, private router: Router) {
     this.state.cart$.subscribe(items => {
       this.cartCount = items.reduce((count, item) => count + item.quantity, 0);
@@ -71,6 +74,15 @@ export class NavbarComponent implements OnInit {
       this.trackOrderLabel    = t('navbar.trackOrder',    '📦 Track Order');
       this.browseCatalogLabel = t('navbar.browseCatalog', 'Browse Catalog');
       this.orderBagLabel      = t('navbar.orderBag',      '🛍️ Order Bag');
+
+      // Dynamic logo: look for an image with contentKey 'navbar.logo'
+      const logoItem = items.find(i => i.contentKey === 'navbar.logo' && i.kind === 'Image');
+      if (logoItem && logoItem.imageUrl) {
+        this.logoSrc = resolveSiteImageUrl(logoItem.imageUrl);
+      } else {
+        // Keep the default fallback if no logo image is set
+        this.logoSrc = '/assets/Artistry-Giftopia-300x300.png';
+      }
     });
   }
 

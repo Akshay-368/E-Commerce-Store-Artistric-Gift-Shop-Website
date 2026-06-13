@@ -34,6 +34,9 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<SystemAuditLog> SystemAuditLogs => Set<SystemAuditLog>();
 
+    public DbSet<SocialLink> SocialLinks => Set<SocialLink>();
+    public DbSet<PaymentDetail> PaymentDetails => Set<PaymentDetail>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -144,5 +147,18 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasIndex(x => new { x.TableName, x.ActionType, x.ActionDate });
             entity.Property(x => x.ActionType).HasConversion<string>();
         });
+
+        modelBuilder.Entity<SocialLink>(entity =>
+        {
+            entity.HasIndex(x => x.Name).IsUnique();
+            entity.Property(x => x.Icon).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<PaymentDetail>(entity =>
+        {
+            entity.HasIndex(x => x.Key).IsUnique();
+            entity.Property(x => x.Key).HasMaxLength(120);
+        });
+
     }
 }

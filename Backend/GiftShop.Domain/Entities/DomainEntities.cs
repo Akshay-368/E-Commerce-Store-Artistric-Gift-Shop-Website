@@ -277,3 +277,32 @@ public sealed class SystemAuditLog : EntityBase
     [MaxLength(240)]
     public string? UserName { get; set; }
 }
+
+// ... existing code ...
+
+public sealed class SocialLink : EntityBase
+{
+    [MaxLength(20)]
+    public string Icon { get; set; } = "📎";   // emoji or icon class
+
+    [MaxLength(80)]
+    public string Name { get; set; } = string.Empty;
+
+    [MaxLength(300)]
+    public string Url { get; set; } = string.Empty;
+
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class PaymentDetail : EntityBase
+{
+    [MaxLength(120)]
+    public string Key { get; set; } = string.Empty;   // e.g. "Phone", "UPI ID"
+
+    [MaxLength(300)]
+    public string Value { get; set; } = string.Empty;
+
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}

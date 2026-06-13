@@ -23,12 +23,6 @@ export interface HighlightCard { icon: string; title: string; body: string; }
 @Component({
   selector: 'app-home',
   standalone: true,
-  // ChangeDetectionStrategy.Default is intentional here (not OnPush).
-  // The component subscribes to Observables and updates plain class fields,
-  // so Angular's default CD is needed to pick up those changes reliably.
-  // We also call cdr.markForCheck() after each subscription emission as an
-  // extra guarantee that the view re-renders immediately even during SSR hydration
-  // (when the browser picks up data that the server could not fetch).
   changeDetection: ChangeDetectionStrategy.Default,
   imports: [CommonModule, FormsModule, ProductCardComponent, SectionSlideshowComponent],
   template: `
@@ -120,8 +114,6 @@ export interface HighlightCard { icon: string; title: string; body: string; }
 
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 5 — HIGHLIGHTS (Why Choose Us)
-         All content driven from DB via siteContent$ — fully editable
-         in the admin Homepage → Highlights tab.
     ═══════════════════════════════════════════════════════════════════ -->
     <section class="highlights" id="highlights">
       <div class="container">
@@ -166,12 +158,10 @@ export interface HighlightCard { icon: string; title: string; body: string; }
           </div>
         </div>
 
-        <!-- Skeleton shimmer — shown while the first fetch is in flight -->
         <div class="product-grid" *ngIf="isLoading">
           <div class="product-skeleton" *ngFor="let s of skeletons"></div>
         </div>
 
-        <!-- Products — rendered as soon as productsLoaded flips true -->
         <ng-container *ngIf="!isLoading">
           <div class="product-grid" *ngIf="visibleProducts.length > 0">
             <app-product-card
@@ -196,9 +186,6 @@ export interface HighlightCard { icon: string; title: string; body: string; }
     <!-- ═══════════════════════════════════════════════════════════════
          FOOTER
     ═══════════════════════════════════════════════════════════════════ -->
-    <!-- ═══════════════════════════════════════════════════════════════
-         FOOTER
-    ═══════════════════════════════════════════════════════════════════ -->
     <footer class="site-footer">
       <div class="container">
         <div class="footer-top">
@@ -219,13 +206,11 @@ export interface HighlightCard { icon: string; title: string; body: string; }
           </div>
         </div>
 
-        <!-- Footer bottom bar -->
         <div class="footer-bottom">
           <span class="footer-copy-small">© {{ year }} {{ footerBrandName }}. All rights reserved.</span>
           <div class="footer-util-links">
             <button class="footer-util-btn" type="button" (click)="openModal('contact')">Contact Us</button>
             <button class="footer-util-btn" type="button" (click)="openModal('terms')">Terms & Policies</button>
-            <button class="footer-util-btn" type="button" (click)="openModal('report')">Report a Problem</button>
           </div>
         </div>
       </div>
@@ -239,14 +224,14 @@ export interface HighlightCard { icon: string; title: string; body: string; }
           <button class="ft-close" (click)="closeModal()">✕</button>
         </div>
         <div class="ft-modal-body" *ngIf="contactContent || contactSocials.length > 0; else noContent">
-          <!-- Social links: stored as JSON array [{emoji, label, url}] in 'footer.contact.socials' -->
+          <!-- Social links (from socialLinks$ observable) -->
           <div *ngIf="contactSocials.length > 0" class="contact-socials">
             <a *ngFor="let s of contactSocials" [href]="s.url" target="_blank" rel="noopener" class="social-link">
-              <span class="social-emoji">{{ s.emoji }}</span>
-              <span>{{ s.label }}</span>
+              <span class="social-emoji">{{ s.icon }}</span>
+              <span>{{ s.name }}</span>
             </a>
           </div>
-          <!-- Free-form contact info text — rendered as plain pre-formatted text -->
+          <!-- Free-form contact info text -->
           <pre class="contact-info-text" *ngIf="contactContent">{{ contactContent }}</pre>
         </div>
         <ng-template #noContent>
@@ -265,28 +250,6 @@ export interface HighlightCard { icon: string; title: string; body: string; }
         <div class="ft-modal-body">
           <div *ngIf="termsContent" class="ft-prose">{{ termsContent }}</div>
           <p *ngIf="!termsContent" class="ft-empty">Terms and policies haven't been written yet. Check back soon!</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ Report a Problem Modal ═══ -->
-    <div class="ft-modal-backdrop" *ngIf="openModalKey === 'report'" (click)="closeModal()">
-      <div class="ft-modal" (click)="$event.stopPropagation()">
-        <div class="ft-modal-header">
-          <h3>Report a Problem</h3>
-          <button class="ft-close" (click)="closeModal()">✕</button>
-        </div>
-        <div class="ft-modal-body">
-          <p class="ft-hint">Spotted a bug or an issue? Let us know below and we'll look into it.</p>
-          <textarea class="ft-textarea" rows="5" placeholder="Describe the problem…" [(ngModel)]="reportText"></textarea>
-          <div *ngIf="reportEmail" class="ft-hint" style="margin-top:0.5rem">
-            Or email us directly at <a [href]="'mailto:' + reportEmail" class="ft-link">{{ reportEmail }}</a>
-          </div>
-          <div class="ft-modal-footer">
-            <button class="ft-btn-submit" type="button" (click)="submitReport()" [disabled]="!reportText.trim() || reportSent">
-              {{ reportSent ? '✓ Sent!' : 'Send Report' }}
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -419,8 +382,6 @@ export class HomeComponent implements OnInit {
   selectedCategory = '';
   displayedCount = 8;
   categories: string[] = [];
-  // isLoading starts true and flips false when products$ emits its first value.
-  // This prevents the empty-state flash while the API call is in flight.
   isLoading = true;
   skeletons = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -440,7 +401,7 @@ export class HomeComponent implements OnInit {
   feature1Para1: string | null = null;
   feature2Para1: string | null = null;
 
-  // Highlights (Why Choose Us)
+  // Highlights
   highlightsEyebrow: string | null = null;
   highlightsTitle: string | null = null;
   highlightCards: HighlightCard[] = DEFAULT_HIGHLIGHTS;
@@ -453,14 +414,13 @@ export class HomeComponent implements OnInit {
   footerLinkStory = 'Our Story';
   year = new Date().getFullYear();
 
-  // Footer modal state
+  // Footer modals
   openModalKey: string | null = null;
   termsContent: string | null = null;
   contactContent: string | null = null;
-  contactSocials: { emoji: string; label: string; url: string }[] = [];
-  reportEmail: string | null = null;
-  reportText = '';
-  reportSent = false;
+
+  // Social links (now from socialLinks$ observable)
+  contactSocials: { icon: string; name: string; url: string }[] = [];
 
   constructor(
     private state: AppStateService,
@@ -468,22 +428,18 @@ export class HomeComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // ── Products subscription ─────────────────────────────────────────────
-    // cdr.markForCheck() is called after every emission so the view updates
-    // immediately even in SSR-hydration mode, without waiting for the next
-    // user interaction event to trigger Angular's change detection cycle.
+    // Products subscription
     this.state.products$.subscribe(products => {
       this.allProducts = products;
-      // Once we've received a response (even empty), stop showing skeletons
       if (this.state.productsLoaded || products.length === 0) {
         this.isLoading = false;
       }
       this.categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
       this.displayedCount = 8;
-      this.cdr.markForCheck();  // ← forces immediate re-render
+      this.cdr.markForCheck();
     });
 
-    // ── Site content subscription ─────────────────────────────────────────
+    // Site content subscription
     this.state.siteContent$.subscribe(items => {
       this.heroImages     = this.buildImageUrls(items, 'hero');
       this.feature1Images = this.buildImageUrls(items, 'feature-1');
@@ -500,8 +456,6 @@ export class HomeComponent implements OnInit {
       this.highlightsEyebrow = this.getText(items, 'highlights.eyebrow');
       this.highlightsTitle   = this.getText(items, 'highlights.title');
 
-      // Parse highlight cards from DB. Each card is stored as a JSON text item
-      // with key "highlights.card.N". Falls back to DEFAULT_HIGHLIGHTS if none seeded.
       const cardItems = items
         .filter(i => i.contentKey.startsWith('highlights.card.') && i.kind === 'Text' && i.textValue)
         .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -526,19 +480,18 @@ export class HomeComponent implements OnInit {
       this.footerLinkStory    = this.getText(items, 'footer.linkStory')    ?? 'Our Story';
       this.termsContent       = this.getText(items, 'footer.terms');
       this.contactContent     = this.getText(items, 'footer.contact.info');
-      this.reportEmail        = this.getText(items, 'footer.report.email');
+      // reportEmail and contactSocials from siteContent removed
 
-      // Contact socials: stored as JSON array [{emoji, label, url}]
-      const socialsRaw = this.getText(items, 'footer.contact.socials');
-      if (socialsRaw) {
-        try { this.contactSocials = JSON.parse(socialsRaw); } catch { this.contactSocials = []; }
-      } else { this.contactSocials = []; }
-
-      this.cdr.markForCheck();  // ← forces immediate re-render
+      this.cdr.markForCheck();
     });
 
-    // Flip isLoading off after a short timeout in case the backend is unreachable
-    // so the page doesn't show skeletons indefinitely.
+    // Social links subscription (new)
+    this.state.socialLinks$.subscribe(links => {
+      this.contactSocials = links; // links array with { icon, name, url, ... }
+      this.cdr.markForCheck();
+    });
+
+    // Fallback timeout
     setTimeout(() => {
       if (this.isLoading) {
         this.isLoading = false;
@@ -584,16 +537,6 @@ export class HomeComponent implements OnInit {
   trackById(_: number, p: ProductItem): string { return p.id; }
   scrollTo(id: string): void { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
 
-  openModal(key: string) { this.openModalKey = key; this.reportSent = false; this.reportText = ''; }
+  openModal(key: string) { this.openModalKey = key; }
   closeModal() { this.openModalKey = null; }
-
-  submitReport() {
-    if (!this.reportText.trim()) return;
-    // If a report email is set, open mailto; otherwise just mark as sent
-    if (this.reportEmail) {
-      window.open(`mailto:${this.reportEmail}?subject=Problem Report&body=${encodeURIComponent(this.reportText)}`);
-    }
-    this.reportSent = true;
-    setTimeout(() => { this.reportSent = false; this.reportText = ''; this.closeModal(); }, 2000);
-  }
 }
