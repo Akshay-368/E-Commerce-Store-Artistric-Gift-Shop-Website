@@ -13,11 +13,14 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
         <button class="modal-close-btn" type="button" (click)="close()">✕</button>
         <h3>Track Your Order</h3>
 
-        @if (!order()) {
-          <p>Enter your Order ID or phone number to check status.</p>
+        <!-- ── Search form (shown when no results yet) ── -->
+        @if (orders().length === 0 && !order()) {
+          <p class="track-sub">Enter your Order ID or phone number to check status.</p>
           <div class="track-input-group">
-            <input #idInput placeholder="Order ID (e.g. ORD-2026-X8B9)" (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
-            <input #phoneInput placeholder="Or enter Phone Number" (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+            <input #idInput placeholder="Order ID (e.g. ORD-2026-X8B9)"
+              (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+            <input #phoneInput placeholder="Or enter Phone Number"
+              (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
             <button class="btn-track-search" (click)="lookup(idInput.value, phoneInput.value)">Search</button>
           </div>
           @if (searchError()) {
@@ -25,8 +28,38 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
           }
         }
 
+        <!-- ── Multiple orders found by phone ── -->
+        @if (orders().length > 1 && !order()) {
+          <div class="results-header">
+            <span class="results-count">{{ orders().length }} orders found</span>
+            <button class="btn-search-again" (click)="searchAgain()">← New Search</button>
+          </div>
+          <div class="orders-list">
+            @for (o of orders(); track o.id) {
+              <button class="order-list-item" type="button" (click)="selectOrder(o)">
+                <div class="oli-left">
+                  <span class="oli-number">{{ o.publicOrderNumber }}</span>
+                  <span class="oli-date">{{ o.createdAt | date:'d MMM yyyy' }}</span>
+                </div>
+                <div class="oli-right">
+                  <span class="oli-badge" [ngClass]="statusBadgeClass(o)">{{ statusLabel(o) }}</span>
+                  <span class="oli-arrow">›</span>
+                </div>
+              </button>
+            }
+          </div>
+        }
+
+        <!-- ── Single order detail (either direct lookup or selected from list) ── -->
         @if (order(); as ord) {
           <div class="track-result show">
+            <!-- Back button when coming from a multi-result list -->
+            @if (orders().length > 1) {
+              <button class="btn-search-again" (click)="backToList()">← All Orders</button>
+            } @else {
+              <button class="btn-search-again" (click)="searchAgain()">← New Search</button>
+            }
+
             <div class="track-result-header">
               <div class="track-order-id">
                 <strong>{{ ord.publicOrderNumber }}</strong><br/>
@@ -50,7 +83,9 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
                 <div class="track-step-dot"></div>
                 <div class="track-step-label">Order Placed</div>
               </div>
-              <div class="track-step" [class.done]="isPaymentVerified(ord)" [class.failed]="ord.paymentStatus === 'Failed'">
+              <div class="track-step"
+                [class.done]="isPaymentVerified(ord)"
+                [class.failed]="ord.paymentStatus === 'Failed'">
                 <div class="track-step-dot"></div>
                 <div class="track-step-label">{{ ord.paymentStatus === 'Failed' ? 'Payment Failed' : 'Payment Verified' }}</div>
               </div>
@@ -68,7 +103,7 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               </div>
             </div>
 
-            <!-- Payment QR codes (if PendingPayment and payment not failed) -->
+            <!-- Payment QR codes -->
             @if (ord.status === 'PendingPayment' && ord.paymentStatus !== 'Failed' && paymentQrImages().length > 0) {
               <div class="payment-section">
                 <h4>Complete Your Payment</h4>
@@ -92,42 +127,55 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
 
             <!-- Send note -->
             <div class="note-row">
-              <input #noteInput placeholder="Type a note to the owner..." (keyup.enter)="sendNote(noteInput.value); noteInput.value = ''" />
+              <input #noteInput placeholder="Type a note to the owner..."
+                (keyup.enter)="sendNote(noteInput.value); noteInput.value = ''" />
               <button class="btn-note" (click)="sendNote(noteInput.value); noteInput.value = ''">Send Note</button>
             </div>
-
-            <!-- Search again -->
-            <button class="btn-search-again" (click)="searchAgain()">← Search Another Order</button>
           </div>
         }
       </div>
     </div>
   `,
-  styles: [
-    `:host{position:fixed;inset:0;z-index:800;pointer-events:none}
+  styles: [`
+    :host{position:fixed;inset:0;z-index:800;pointer-events:none}
     #track-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:1.5rem;opacity:0;pointer-events:none;transition:opacity 0.3s}
     #track-modal.active{opacity:1;pointer-events:auto}
     .modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)}
     .track-card{position:relative;z-index:1;background:#fff;border-radius:20px;padding:2rem 2rem 2.5rem;max-width:540px;width:100%;box-shadow:0 24px 64px rgba(34,34,34,0.2);transform:translateY(20px);transition:transform 0.3s;max-height:90vh;overflow-y:auto}
     #track-modal.active .track-card{transform:translateY(0)}
     .track-card h3{font-family:var(--font-display);font-size:1.4rem;color:var(--color-charcoal);margin-bottom:0.3rem}
+    .track-sub{font-size:0.88rem;color:var(--color-body);margin-bottom:1rem}
     .track-input-group{display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem}
     .track-input-group input{flex:1;min-width:140px;padding:0.7rem 1rem;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.9rem;font-family:var(--font-ui);outline:none;transition:var(--transition)}
     .track-input-group input:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(136,173,53,0.12)}
-    .btn-track-search{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1.3rem;border-radius:var(--radius-sm);font-weight:600;transition:var(--transition)}
+    .btn-track-search{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1.3rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition)}
     .btn-track-search:hover{background:var(--color-primary-d)}
     .error-msg{color:#e05454;font-size:0.85rem;margin-top:0.5rem}
+
+    /* ── Multi-result list ── */
+    .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem}
+    .results-count{font-size:0.82rem;font-weight:600;color:var(--color-body)}
+    .orders-list{display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.5rem}
+    .order-list-item{display:flex;align-items:center;justify-content:space-between;width:100%;background:var(--color-sage);border:1.5px solid transparent;border-radius:12px;padding:0.9rem 1.1rem;cursor:pointer;text-align:left;transition:border-color 0.15s,background 0.15s;font-family:var(--font-ui)}
+    .order-list-item:hover{border-color:var(--color-primary);background:rgba(136,173,53,0.08)}
+    .oli-left{display:flex;flex-direction:column;gap:0.2rem}
+    .oli-number{font-size:0.92rem;font-weight:700;color:var(--color-charcoal);font-family:monospace}
+    .oli-date{font-size:0.78rem;color:var(--color-body)}
+    .oli-right{display:flex;align-items:center;gap:0.6rem}
+    .oli-arrow{font-size:1.3rem;color:var(--color-border);line-height:1}
+
+    /* ── Single order result ── */
     .track-result{background:var(--color-sage);border-radius:12px;padding:1.25rem;display:none}
     .track-result.show{display:block}
-    .track-result-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:1rem}
+    .track-result-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;gap:1rem;margin-top:0.75rem}
     .track-order-id{font-size:0.88rem;color:var(--color-body)}
     .track-order-id strong{color:var(--color-charcoal);font-size:1rem}
-    .track-status-badge{padding:0.3rem 0.85rem;border-radius:50px;font-size:0.78rem;font-weight:600;white-space:nowrap}
+    .track-status-badge{padding:0.3rem 0.85rem;border-radius:50px;font-size:0.78rem;font-weight:600;white-space:nowrap;flex-shrink:0}
     .status-pending{background:rgba(245,158,11,0.15);color:#d97706}
     .status-verified{background:rgba(136,173,53,0.15);color:var(--color-primary-d)}
     .status-failed{background:rgba(224,84,84,0.15);color:#e05454}
     .status-cancelled{background:rgba(100,100,100,0.15);color:#666}
-    .payment-failed-banner{background:rgba(224,84,84,0.1);border:1.5px solid rgba(224,84,84,0.35);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.86rem;color:#c0392b}
+    .payment-failed-banner{background:rgba(224,84,84,0.08);border:1.5px solid rgba(224,84,84,0.25);border-radius:10px;padding:0.7rem 0.9rem;margin-bottom:0.9rem;font-size:0.84rem;color:#c0392b}
     .track-timeline{display:flex;justify-content:space-between;margin-top:1rem;position:relative;gap:0.5rem}
     .track-timeline::before{content:'';position:absolute;top:11px;left:8%;right:8%;height:2px;background:var(--color-border)}
     .track-step{text-align:center;position:relative;z-index:1;flex:1}
@@ -135,27 +183,32 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     .track-step.done .track-step-dot{background:var(--color-primary);box-shadow:0 0 0 2px var(--color-primary)}
     .track-step.failed .track-step-dot{background:#e05454;box-shadow:0 0 0 2px #e05454}
     .track-step.failed .track-step-label{color:#e05454;font-weight:600}
-    .track-step-label{font-size:0.68rem;color:var(--color-body);font-weight:500}
+    .track-step-label{font-size:0.67rem;color:var(--color-body);font-weight:500}
     .timeline-messages{margin-top:1rem;border-top:1px solid rgba(209,209,209,0.5);padding-top:0.75rem}
     .msg{font-size:0.86rem;color:var(--color-body);padding:0.2rem 0}
     .note-row{display:flex;gap:0.6rem;margin-top:1rem}
     .note-row input{flex:1;padding:0.7rem 1rem;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.9rem;font-family:var(--font-ui);outline:none;transition:var(--transition)}
     .note-row input:focus{border-color:var(--color-primary)}
-    .btn-note{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1rem;border-radius:var(--radius-sm);font-weight:600;transition:var(--transition)}
+    .btn-note{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition)}
     .btn-note:hover{background:var(--color-primary-d)}
-    .btn-search-again{display:inline-block;margin-top:0.75rem;background:none;border:none;color:var(--color-body);font-size:0.82rem;cursor:pointer;text-decoration:underline;padding:0}
+    .btn-search-again{display:inline-block;margin-bottom:0.5rem;background:none;border:none;color:var(--color-body);font-size:0.82rem;cursor:pointer;text-decoration:underline;padding:0;font-family:var(--font-ui)}
     .btn-search-again:hover{color:var(--color-charcoal)}
-    .modal-close-btn{position:absolute;top:1.25rem;right:1.25rem;background:var(--color-bg);border:none;width:34px;height:34px;border-radius:50%;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:var(--transition)}
+    .modal-close-btn{position:absolute;top:1.25rem;right:1.25rem;background:var(--color-bg);border:none;width:34px;height:34px;border-radius:50%;font-size:1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition)}
     .modal-close-btn:hover{background:var(--color-border)}
     .payment-section{margin:1rem 0;padding:1rem;background:rgba(136,173,53,0.06);border-radius:12px}
+    .payment-section h4{font-size:0.88rem;font-weight:600;color:var(--color-charcoal);margin-bottom:0.3rem}
+    .payment-section p{font-size:0.82rem;color:var(--color-body);margin-bottom:0.6rem}
     .qr-gallery{display:flex;gap:10px;flex-wrap:wrap}
     .qr-image{width:120px;height:120px;object-fit:contain;border:1px solid var(--color-border);border-radius:8px}
-    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:10%;right:10%}}
-    `
-  ]
+    .oli-badge{padding:0.25rem 0.7rem;border-radius:50px;font-size:0.74rem;font-weight:600;white-space:nowrap}
+    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:12%;right:12%}}
+  `]
 })
 export class TrackOrderModalComponent implements OnInit {
   open = false;
+  /** All orders returned by a phone search — sorted newest first */
+  orders = signal<Order[]>([]);
+  /** The single order currently being viewed in detail */
   order = signal<Order | null>(null);
   searchError = signal('');
   paymentQrImages = signal<string[]>([]);
@@ -168,8 +221,7 @@ export class TrackOrderModalComponent implements OnInit {
       if (val.open && val.orderNumber) {
         this.fetchOrder(val.orderNumber);
       } else if (!val.open) {
-        this.order.set(null);
-        this.searchError.set('');
+        this.reset();
       }
     });
 
@@ -182,30 +234,52 @@ export class TrackOrderModalComponent implements OnInit {
     });
   }
 
-  close() {
-    this.state.hideTrackModal();
-  }
+  close() { this.state.hideTrackModal(); }
 
-  searchAgain() {
+  private reset() {
+    this.orders.set([]);
     this.order.set(null);
     this.searchError.set('');
   }
 
+  searchAgain() { this.reset(); }
+
+  /** Go back to the multi-result list without clearing it */
+  backToList() { this.order.set(null); }
+
+  /** User tapped an order card in the multi-result list */
+  selectOrder(o: Order) { this.order.set(o); }
+
   lookup(id: string, phone: string) {
     this.searchError.set('');
-    const trimmedId = id?.trim();
+    const trimmedId    = id?.trim();
     const trimmedPhone = phone?.trim();
 
     if (trimmedId) {
+      // Direct order-ID lookup — always shows single detail view
+      this.orders.set([]);
       this.fetchOrder(trimmedId);
     } else if (trimmedPhone) {
       this.state.findOrderByPhone(trimmedPhone).subscribe({
-        next: orders => {
-          if (orders.length > 0) {
-            this.order.set(orders[0]);
-          } else {
+        next: raw => {
+          if (!raw || raw.length === 0) {
+            this.orders.set([]);
             this.order.set(null);
             this.searchError.set('No orders found for that phone number.');
+            return;
+          }
+          // Sort newest first
+          const sorted = [...raw].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          if (sorted.length === 1) {
+            // Only one order — go straight to detail
+            this.orders.set([]);
+            this.order.set(sorted[0]);
+          } else {
+            // Multiple — show the list
+            this.orders.set(sorted);
+            this.order.set(null);
           }
         },
         error: () => this.searchError.set('Could not search orders.')
@@ -218,7 +292,7 @@ export class TrackOrderModalComponent implements OnInit {
   fetchOrder(orderNumber: string) {
     this.searchError.set('');
     this.state.getOrderByNumber(orderNumber).subscribe({
-      next: order => this.order.set(order),
+      next: o  => this.order.set(o),
       error: () => this.searchError.set('Order not found.')
     });
   }
@@ -227,43 +301,41 @@ export class TrackOrderModalComponent implements OnInit {
     const ord = this.order();
     if (!ord || !text.trim()) return;
     this.state.addOrderMessageByNumber(ord.publicOrderNumber, text.trim()).subscribe({
-      next: (msg) => {
-        this.order.update(o => o ? { ...o, messages: [...o.messages, msg] } : o);
-      },
-      error: () => this.searchError.set('Could not send message.')
+      next: msg => this.order.update(o => o ? { ...o, messages: [...o.messages, msg] } : o),
+      error: ()  => this.searchError.set('Could not send message.')
     });
   }
 
   // ── Status helpers ──────────────────────────────────────────────────
 
-  statusLabel(ord: Order): string {
-    if (ord.paymentStatus === 'Failed') return 'Payment Failed';
-    if (ord.status === 'Cancelled') return 'Cancelled';
-    if (ord.status === 'Delivered') return 'Delivered';
-    if (ord.status === 'Dispatched') return 'Dispatched';
-    if (ord.status === 'Packed') return 'Packed';
-    if (ord.status === 'PaymentVerified') return 'Payment Verified';
+  statusLabel(o: Order): string {
+    if (o.paymentStatus === 'Failed') return 'Payment Failed';
+    if (o.status === 'Cancelled')     return 'Cancelled';
+    if (o.status === 'Delivered')     return 'Delivered';
+    if (o.status === 'Dispatched')    return 'Dispatched';
+    if (o.status === 'Packed')        return 'Packed';
+    if (o.status === 'PaymentVerified') return 'Payment Verified';
     return 'Pending Payment';
   }
 
-  statusBadgeClass(ord: Order): Record<string, boolean> {
+  statusBadgeClass(o: Order): Record<string, boolean> {
     return {
-      'status-failed': ord.paymentStatus === 'Failed',
-      'status-cancelled': ord.status === 'Cancelled',
-      'status-verified': ord.status !== 'PendingPayment' && ord.status !== 'Cancelled' && ord.paymentStatus !== 'Failed',
-      'status-pending': ord.status === 'PendingPayment' && ord.paymentStatus !== 'Failed',
+      'status-failed':    o.paymentStatus === 'Failed',
+      'status-cancelled': o.status === 'Cancelled',
+      'status-verified':  !['PendingPayment','Cancelled'].includes(o.status) && o.paymentStatus !== 'Failed',
+      'status-pending':   o.status === 'PendingPayment' && o.paymentStatus !== 'Failed',
     };
   }
 
-  isPaymentVerified(ord: Order): boolean {
-    return ['PaymentVerified', 'Packed', 'Dispatched', 'Delivered'].includes(ord.status);
+  isPaymentVerified(o: Order): boolean {
+    return ['PaymentVerified','Packed','Dispatched','Delivered'].includes(o.status);
   }
 
-  isPacked(ord: Order): boolean {
-    return ['Packed', 'Dispatched', 'Delivered'].includes(ord.status);
+  isPacked(o: Order): boolean {
+    return ['Packed','Dispatched','Delivered'].includes(o.status);
   }
 
-  isDispatched(ord: Order): boolean {
-    return ['Dispatched', 'Delivered'].includes(ord.status);
+  isDispatched(o: Order): boolean {
+    return ['Dispatched','Delivered'].includes(o.status);
   }
 }

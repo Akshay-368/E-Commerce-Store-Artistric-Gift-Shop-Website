@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy, ChangeDetectorRef,
   Component, OnInit
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
   AppStateService, ProductItem, SiteContentItem, resolveSiteImageUrl
 } from '../services/app-state.service';
@@ -29,7 +30,7 @@ export interface HighlightCard { icon: string; title: string; body: string; }
   // extra guarantee that the view re-renders immediately even during SSR hydration
   // (when the browser picks up data that the server could not fetch).
   changeDetection: ChangeDetectionStrategy.Default,
-  imports: [CommonModule, ProductCardComponent, SectionSlideshowComponent],
+  imports: [CommonModule, FormsModule, ProductCardComponent, SectionSlideshowComponent],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════
          SECTION 1 — HERO
@@ -195,24 +196,100 @@ export interface HighlightCard { icon: string; title: string; body: string; }
     <!-- ═══════════════════════════════════════════════════════════════
          FOOTER
     ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════
+         FOOTER
+    ═══════════════════════════════════════════════════════════════════ -->
     <footer class="site-footer">
       <div class="container">
-        <div class="footer-inner">
+        <div class="footer-top">
+          <!-- Brand block -->
           <div class="footer-brand">
-            <img src="/assets/Artistry-Giftopia-300x300.png" alt="Kalakaari Gifting" />
+            <img src="/assets/Artistry-Giftopia-300x300.png" [alt]="footerBrandName" />
             <div class="footer-brand-text">
-              <strong>Kalakaari Gifting</strong>
-              <span>Where Creativity Becomes a Gift</span>
+              <strong>{{ footerBrandName }}</strong>
+              <span>{{ footerBrandTagline }}</span>
             </div>
           </div>
-          <p class="footer-copy">Curating smiles and celebrating sweet connections since 2024. Made locally with love. 💚</p>
+          <!-- Copy -->
+          <p class="footer-copy">{{ footerCopy }}</p>
+          <!-- Primary nav links -->
           <div class="footer-links">
-            <a href="#catalog" (click)="scrollTo('catalog'); $event.preventDefault()">Browse Catalog</a>
-            <a href="#manifesto" (click)="scrollTo('manifesto'); $event.preventDefault()">Our Story</a>
+            <a href="#catalog"   (click)="scrollTo('catalog');   $event.preventDefault()">{{ footerLinkCatalog }}</a>
+            <a href="#manifesto" (click)="scrollTo('manifesto'); $event.preventDefault()">{{ footerLinkStory }}</a>
+          </div>
+        </div>
+
+        <!-- Footer bottom bar -->
+        <div class="footer-bottom">
+          <span class="footer-copy-small">© {{ year }} {{ footerBrandName }}. All rights reserved.</span>
+          <div class="footer-util-links">
+            <button class="footer-util-btn" type="button" (click)="openModal('contact')">Contact Us</button>
+            <button class="footer-util-btn" type="button" (click)="openModal('terms')">Terms & Policies</button>
+            <button class="footer-util-btn" type="button" (click)="openModal('report')">Report a Problem</button>
           </div>
         </div>
       </div>
     </footer>
+
+    <!-- ═══ Contact Us Modal ═══ -->
+    <div class="ft-modal-backdrop" *ngIf="openModalKey === 'contact'" (click)="closeModal()">
+      <div class="ft-modal" (click)="$event.stopPropagation()">
+        <div class="ft-modal-header">
+          <h3>Contact Us</h3>
+          <button class="ft-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="ft-modal-body" *ngIf="contactContent || contactSocials.length > 0; else noContent">
+          <!-- Social links: stored as JSON array [{emoji, label, url}] in 'footer.contact.socials' -->
+          <div *ngIf="contactSocials.length > 0" class="contact-socials">
+            <a *ngFor="let s of contactSocials" [href]="s.url" target="_blank" rel="noopener" class="social-link">
+              <span class="social-emoji">{{ s.emoji }}</span>
+              <span>{{ s.label }}</span>
+            </a>
+          </div>
+          <!-- Free-form contact info text — rendered as plain pre-formatted text -->
+          <pre class="contact-info-text" *ngIf="contactContent">{{ contactContent }}</pre>
+        </div>
+        <ng-template #noContent>
+          <p class="ft-empty">Contact information hasn't been set up yet. Check back soon!</p>
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- ═══ Terms & Policies Modal ═══ -->
+    <div class="ft-modal-backdrop" *ngIf="openModalKey === 'terms'" (click)="closeModal()">
+      <div class="ft-modal ft-modal-wide" (click)="$event.stopPropagation()">
+        <div class="ft-modal-header">
+          <h3>Terms &amp; Policies</h3>
+          <button class="ft-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="ft-modal-body">
+          <div *ngIf="termsContent" class="ft-prose">{{ termsContent }}</div>
+          <p *ngIf="!termsContent" class="ft-empty">Terms and policies haven't been written yet. Check back soon!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Report a Problem Modal ═══ -->
+    <div class="ft-modal-backdrop" *ngIf="openModalKey === 'report'" (click)="closeModal()">
+      <div class="ft-modal" (click)="$event.stopPropagation()">
+        <div class="ft-modal-header">
+          <h3>Report a Problem</h3>
+          <button class="ft-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="ft-modal-body">
+          <p class="ft-hint">Spotted a bug or an issue? Let us know below and we'll look into it.</p>
+          <textarea class="ft-textarea" rows="5" placeholder="Describe the problem…" [(ngModel)]="reportText"></textarea>
+          <div *ngIf="reportEmail" class="ft-hint" style="margin-top:0.5rem">
+            Or email us directly at <a [href]="'mailto:' + reportEmail" class="ft-link">{{ reportEmail }}</a>
+          </div>
+          <div class="ft-modal-footer">
+            <button class="ft-btn-submit" type="button" (click)="submitReport()" [disabled]="!reportText.trim() || reportSent">
+              {{ reportSent ? '✓ Sent!' : 'Send Report' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   `,
   styles: [`
     :host { display: block }
@@ -290,19 +367,48 @@ export interface HighlightCard { icon: string; title: string; body: string; }
     .btn-load-more:hover { background:var(--color-primary);color:#fff }
     .empty-state { text-align:center;padding:4rem 0;color:var(--color-body) }
     .empty-icon { font-size:3rem;margin-bottom:1rem }
-    .site-footer { background:var(--color-charcoal);color:rgba(255,255,255,0.7);padding:3rem 0 2rem }
-    .footer-inner { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem }
+    .site-footer { background:var(--color-charcoal);color:rgba(255,255,255,0.7);padding:2.5rem 0 0 }
+    .footer-top { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;padding-bottom:1.75rem;border-bottom:1px solid rgba(255,255,255,0.08) }
+    .footer-bottom { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;padding:1rem 0 1.5rem }
+    .footer-copy-small { font-size:0.78rem;color:rgba(255,255,255,0.35) }
+    .footer-util-links { display:flex;gap:1rem;flex-wrap:wrap }
+    .footer-util-btn { background:none;border:none;color:rgba(255,255,255,0.45);font-size:0.8rem;cursor:pointer;font-family:var(--font-ui);padding:0;transition:color 0.2s }
+    .footer-util-btn:hover { color:var(--color-primary) }
     .footer-brand { display:flex;align-items:center;gap:0.75rem }
     .footer-brand img { width:38px;height:38px;border-radius:8px }
     .footer-brand-text strong { display:block;font-size:0.95rem;color:#fff;font-family:var(--font-display) }
     .footer-brand-text span { font-size:0.78rem }
-    .footer-copy { font-size:0.82rem;text-align:center }
+    .footer-copy { font-size:0.82rem;text-align:center;max-width:340px }
     .footer-links { display:flex;gap:1.5rem;font-size:0.83rem }
-    .footer-links a { transition:var(--transition) }
+    .footer-links a { color:rgba(255,255,255,0.7);text-decoration:none;transition:var(--transition) }
     .footer-links a:hover { color:var(--color-primary) }
+    /* ── Footer modals ── */
+    .ft-modal-backdrop { position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);z-index:1200;display:flex;align-items:center;justify-content:center;padding:1.5rem }
+    .ft-modal { background:#fff;border-radius:18px;max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.25) }
+    .ft-modal-wide { max-width:700px }
+    .ft-modal-header { display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid rgba(0,0,0,0.07) }
+    .ft-modal-header h3 { font-family:var(--font-display);font-size:1.15rem;color:var(--color-charcoal) }
+    .ft-close { background:rgba(0,0,0,0.06);border:none;width:30px;height:30px;border-radius:50%;font-size:0.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center }
+    .ft-close:hover { background:rgba(0,0,0,0.12) }
+    .ft-modal-body { padding:1.25rem 1.5rem;overflow-y:auto;flex:1 }
+    .ft-modal-footer { padding-top:1rem;display:flex;justify-content:flex-end }
+    .ft-hint { font-size:0.85rem;color:var(--color-body);margin-bottom:0.75rem }
+    .ft-empty { font-size:0.9rem;color:var(--color-body);text-align:center;padding:1rem 0 }
+    .ft-prose { font-size:0.9rem;color:var(--color-body);line-height:1.75;white-space:pre-wrap }
+    .ft-textarea { width:100%;border:1.5px solid var(--color-border);border-radius:10px;padding:0.75rem 1rem;font-size:0.9rem;font-family:var(--font-ui);outline:none;resize:vertical;box-sizing:border-box }
+    .ft-textarea:focus { border-color:var(--color-primary) }
+    .ft-btn-submit { background:var(--color-primary);color:#fff;border:none;padding:0.65rem 1.4rem;border-radius:50px;font-size:0.9rem;font-weight:600;cursor:pointer;transition:var(--transition) }
+    .ft-btn-submit:hover:not(:disabled) { background:var(--color-primary-d) }
+    .ft-btn-submit:disabled { opacity:0.5;cursor:not-allowed }
+    .ft-link { color:var(--color-primary);text-decoration:underline }
+    .contact-socials { display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1rem }
+    .social-link { display:flex;align-items:center;gap:0.6rem;color:var(--color-charcoal);text-decoration:none;font-size:0.92rem;padding:0.45rem 0;border-bottom:1px solid rgba(0,0,0,0.05);transition:color 0.2s }
+    .social-link:hover { color:var(--color-primary) }
+    .social-emoji { font-size:1.2rem;width:1.6rem;text-align:center }
+    .contact-info-text { font-size:0.88rem;color:var(--color-body);line-height:1.7;white-space:pre-wrap;margin-top:0.5rem }
     @keyframes bounce { 0%,100% { transform:translateX(-50%) translateY(0) } 50% { transform:translateX(-50%) translateY(6px) } }
     @media (max-width:900px) { .feature-grid { grid-template-columns:1fr;gap:2.5rem } .feature-grid.reverse { direction:ltr } .feature-img-wrap { aspect-ratio:16/9 } .catalog-header { flex-direction:column;align-items:flex-start } }
-    @media (max-width:600px) { .product-grid { grid-template-columns:1fr 1fr;gap:1rem } .manifesto blockquote { padding:0 1rem } .footer-inner { flex-direction:column;align-items:center;text-align:center } .footer-links { justify-content:center;flex-wrap:wrap } }
+    @media (max-width:600px) { .product-grid { grid-template-columns:1fr 1fr;gap:1rem } .manifesto blockquote { padding:0 1rem } .footer-top { flex-direction:column;align-items:center;text-align:center } .footer-bottom { flex-direction:column;align-items:center;text-align:center } .footer-links { justify-content:center;flex-wrap:wrap } }
     @media (max-width:420px) { .product-grid { grid-template-columns:1fr } .hero-content h1 { font-size:2rem } }
   `]
 })
@@ -338,6 +444,23 @@ export class HomeComponent implements OnInit {
   highlightsEyebrow: string | null = null;
   highlightsTitle: string | null = null;
   highlightCards: HighlightCard[] = DEFAULT_HIGHLIGHTS;
+
+  // Footer
+  footerBrandName = 'Kalakaari Gifting';
+  footerBrandTagline = 'Where Creativity Becomes a Gift';
+  footerCopy = 'Curating smiles and celebrating sweet connections since 2024. Made locally with love. 💚';
+  footerLinkCatalog = 'Browse Catalog';
+  footerLinkStory = 'Our Story';
+  year = new Date().getFullYear();
+
+  // Footer modal state
+  openModalKey: string | null = null;
+  termsContent: string | null = null;
+  contactContent: string | null = null;
+  contactSocials: { emoji: string; label: string; url: string }[] = [];
+  reportEmail: string | null = null;
+  reportText = '';
+  reportSent = false;
 
   constructor(
     private state: AppStateService,
@@ -395,6 +518,22 @@ export class HomeComponent implements OnInit {
         this.highlightCards = DEFAULT_HIGHLIGHTS;
       }
 
+      // Footer text fields
+      this.footerBrandName    = this.getText(items, 'footer.brandName')    ?? 'Kalakaari Gifting';
+      this.footerBrandTagline = this.getText(items, 'footer.brandTagline') ?? 'Where Creativity Becomes a Gift';
+      this.footerCopy         = this.getText(items, 'footer.copy')         ?? 'Curating smiles and celebrating sweet connections since 2024. Made locally with love. 💚';
+      this.footerLinkCatalog  = this.getText(items, 'footer.linkCatalog')  ?? 'Browse Catalog';
+      this.footerLinkStory    = this.getText(items, 'footer.linkStory')    ?? 'Our Story';
+      this.termsContent       = this.getText(items, 'footer.terms');
+      this.contactContent     = this.getText(items, 'footer.contact.info');
+      this.reportEmail        = this.getText(items, 'footer.report.email');
+
+      // Contact socials: stored as JSON array [{emoji, label, url}]
+      const socialsRaw = this.getText(items, 'footer.contact.socials');
+      if (socialsRaw) {
+        try { this.contactSocials = JSON.parse(socialsRaw); } catch { this.contactSocials = []; }
+      } else { this.contactSocials = []; }
+
       this.cdr.markForCheck();  // ← forces immediate re-render
     });
 
@@ -444,4 +583,17 @@ export class HomeComponent implements OnInit {
   loadMore(): void { this.displayedCount += 8; }
   trackById(_: number, p: ProductItem): string { return p.id; }
   scrollTo(id: string): void { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
+
+  openModal(key: string) { this.openModalKey = key; this.reportSent = false; this.reportText = ''; }
+  closeModal() { this.openModalKey = null; }
+
+  submitReport() {
+    if (!this.reportText.trim()) return;
+    // If a report email is set, open mailto; otherwise just mark as sent
+    if (this.reportEmail) {
+      window.open(`mailto:${this.reportEmail}?subject=Problem Report&body=${encodeURIComponent(this.reportText)}`);
+    }
+    this.reportSent = true;
+    setTimeout(() => { this.reportSent = false; this.reportText = ''; this.closeModal(); }, 2000);
+  }
 }

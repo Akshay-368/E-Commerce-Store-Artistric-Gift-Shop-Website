@@ -54,6 +54,30 @@ const SECTIONS: SectionDef[] = [
   key: 'payment-qr', label: '💳 Payment QR', sectionName: 'payment-qr', hasImages: true,
   textFields: []  // only images
   },
+  {
+    key: 'navbar', label: '🔗 Navbar', sectionName: 'navbar', hasImages: false,
+    textFields: [
+      { key: 'navbar.brandName',     label: 'Brand name',                       placeholder: 'Kalakaari Gifting' },
+      { key: 'navbar.brandTagline',  label: 'Brand tagline (below brand name)', placeholder: 'Handmade with Love' },
+      { key: 'navbar.trackOrder',    label: 'Track Order button label',         placeholder: '📦 Track Order' },
+      { key: 'navbar.browseCatalog', label: 'Browse Catalog button label',      placeholder: 'Browse Catalog' },
+      { key: 'navbar.orderBag',      label: 'Order Bag button label',           placeholder: '🛍️ Order Bag' },
+    ]
+  },
+  {
+    key: 'footer', label: '🦶 Footer', sectionName: 'footer', hasImages: false,
+    textFields: [
+      { key: 'footer.brandName',        label: 'Footer brand name',                               placeholder: 'Kalakaari Gifting' },
+      { key: 'footer.brandTagline',     label: 'Footer brand tagline',                            placeholder: 'Where Creativity Becomes a Gift' },
+      { key: 'footer.copy',             label: 'Footer paragraph / description',                  placeholder: 'Curating smiles since 2024...', multiline: true },
+      { key: 'footer.linkCatalog',      label: '"Browse Catalog" link label',                     placeholder: 'Browse Catalog' },
+      { key: 'footer.linkStory',        label: '"Our Story" link label',                          placeholder: 'Our Story' },
+      { key: 'footer.terms',            label: 'Terms & Policies content',                        placeholder: 'Return policy: ...\nPrivacy: ...', multiline: true },
+      { key: 'footer.contact.info',     label: 'Contact info (phone, email, hours)',              placeholder: '📞 +91 98765 43210\n📧 hello@kalakaari.in\n⏰ Mon-Sat 10am-6pm', multiline: true },
+      { key: 'footer.contact.socials',  label: 'Social links (JSON array)',                       placeholder: '[{"emoji":"📸","label":"Instagram","url":"https://instagram.com/..."}]', multiline: true },
+      { key: 'footer.report.email',     label: 'Report-a-problem destination email',             placeholder: 'support@kalakaari.in' },
+    ]
+  },
 ];
 
 @Component({
@@ -171,6 +195,9 @@ const SECTIONS: SectionDef[] = [
                       </button>
                       @if (savedText()[tf.key]) { <span class="saved-badge">✓ Saved</span> }
                     </div>
+                    @if (tf.key === 'footer.contact.socials') {
+                      <p class="field-hint">Format: <span class="hint-code">[ {{ '{' }}"emoji":"📸","label":"Instagram","url":"https://instagram.com/page"{{ '}' }}, ... ]</span></p>
+                    }
                   </div>
                 }
               </div>
@@ -302,6 +329,8 @@ const SECTIONS: SectionDef[] = [
     .btn-save-text:hover:not(:disabled) { background: rgba(136,173,53,0.18); }
     .btn-save-text:disabled { opacity: 0.5; cursor: not-allowed; }
     .saved-badge { font-size: 11.5px; color: #3dcf8e; font-weight: 600; }
+    .field-hint { font-size: 11.5px; color: #555; margin-top: 5px; line-height: 1.5; }
+    .hint-code { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 2px 5px; font-family: monospace; font-size: 11px; color: #88ad35; word-break: break-all; display: inline; }
 
     /* Highlight card editor */
     .cards-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
