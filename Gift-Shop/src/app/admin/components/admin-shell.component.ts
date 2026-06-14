@@ -1,9 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { getSeenIds, SEEN_ORDERS_KEY } from '../pages/admin-orders.component';
-import { AdminApiService } from '../services/admin-api.services';
 import { AdminAuthService } from '../services/admin-auth.service';
+import { AdminOrdersStateService } from '../services/admin-orders-state.service';
 
 @Component({
   selector: 'app-admin-shell',
@@ -160,13 +159,13 @@ import { AdminAuthService } from '../services/admin-auth.service';
 export class AdminShellComponent implements OnInit {
   sidebarCollapsed = signal(false);
 
-  // Live unseen count derived from localStorage + API fetch
-  private allOrderIds = signal<string[]>([]);
-  private seenIds = signal<Set<string>>(getSeenIds());
+  // Shared singleton — instantly reflects seen/unseen changes made from the
+  // Orders page (✓ button, "mark all seen", opening order details) without
+  // needing a logout/login cycle.
+  private ordersState = inject(AdminOrdersStateService);
 
   unseenBadge = computed(() => {
-    const seen = this.seenIds();
-    const count = this.allOrderIds().filter(id => !seen.has(id)).length;
+    const count = this.ordersState.unseenCount();
     return count > 0 ? String(count) : undefined;
   });
 
@@ -214,36 +213,16 @@ export class AdminShellComponent implements OnInit {
 
   currentPageTitle = computed(() => 'Admin Portal');
 
-  private api = inject(AdminApiService);
-
   constructor(private auth: AdminAuthService, private router: Router) {}
 
   ngOnInit() {
-    this.refreshBadge();
-
-    // Re-sync whenever localStorage changes (e.g. admin marks orders seen in the orders page)
-    window.addEventListener('storage', (e) => {
-      if (e.key === SEEN_ORDERS_KEY) {
-        this.seenIds.set(getSeenIds());
-      }
-    });
-  }
-
-  private refreshBadge() {
-    // Fetch all order IDs (only first page of 100 is enough for badge accuracy)
-    this.api.getOrders(1, 100).subscribe({
-      next: (res) => {
-        this.allOrderIds.set(res.items.map(o => o.id));
-        this.seenIds.set(getSeenIds());
-      },
-      error: () => {}
-    });
+    this.ordersState.refresh();
   }
 
   toggleSidebar() {
     this.sidebarCollapsed.update(v => !v);
-    // Refresh badge whenever the sidebar is opened
-    if (!this.sidebarCollapsed()) this.refreshBadge();
+    // Refresh badge whenever the sidebar is opened — picks up new orders
+    if (!this.sidebarCollapsed()) this.ordersState.refresh();
   }
 
   logout() {

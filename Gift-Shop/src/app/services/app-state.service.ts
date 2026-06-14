@@ -348,6 +348,13 @@ export class AppStateService {
   findOrderByPhone(phone : string) : Observable<Order[]>{
     return this.http.get<Order[]>(`${API_BASE}/api/orders/by-phone/${phone}`);
   }
+
+  // To download an Invoice PDF which returns a blob
+  getOrderInvoice(orderNumber: string): Observable<Blob> {
+  return this.http.get(`${API_BASE}/api/orders/${orderNumber}/invoice`, {
+    responseType: 'blob'
+  });
+}
   /* addMessage(orderId: string, sender: string, text: string) {
     const order = this.findOrderById(orderId);
     if (!order) return null;

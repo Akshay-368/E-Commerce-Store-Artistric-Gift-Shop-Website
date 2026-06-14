@@ -16,6 +16,7 @@
           "Microsoft.AspNetCore.Authentication.JwtBearer": "10.0.5",
           "Microsoft.AspNetCore.OpenApi": "10.0.5",
           "Microsoft.EntityFrameworkCore.Design": "10.0.5",
+          "Otp.NET": "1.4.0",
           "Swashbuckle.AspNetCore": "10.1.7"
         },
         "runtime": {
@@ -539,6 +540,14 @@
           }
         }
       },
+      "Otp.NET/1.4.0": {
+        "runtime": {
+          "lib/net8.0/Otp.NET.dll": {
+            "assemblyVersion": "1.4.0.0",
+            "fileVersion": "1.4.0.0"
+          }
+        }
+      },
       "QuestPDF/2026.6.0": {
         "runtime": {
           "lib/net10.0/QuestPDF.dll": {
@@ -1001,6 +1010,13 @@
       "sha512": "sha512-VQ3FWpv+qqKO67y2dNLfWEuSgqwx+CBPmVmcXn50+XkhYv6SEzOIOHMAA2cAuzheqxgbpk8nNsbgCJ7BuzqLag==",
       "path": "npgsql.entityframeworkcore.postgresql/10.0.0-preview.7",
       "hashPath": "npgsql.entityframeworkcore.postgresql.10.0.0-preview.7.nupkg.sha512"
+    },
+    "Otp.NET/1.4.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Fk1NKc0lWmlo6LAFYpFJInRgFKt72knRNEvxndDYoQHFwYOPXav+WEUBvQA0k4lxq5xt0SymrZ+oi0F/G40bPQ==",
+      "path": "otp.net/1.4.0",
+      "hashPath": "otp.net.1.4.0.nupkg.sha512"
     },
     "QuestPDF/2026.6.0": {
       "type": "package",

@@ -77,7 +77,11 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
-                <input name="phone" required placeholder="+91 98765 43210" />
+                <input name="phone" required placeholder="10-digit mobile number" maxlength="10" inputmode="numeric"
+                  (input)="onPhoneInput($any($event.target).value)" />
+                @if (phoneError()) {
+                  <p class="field-error-msg">{{ phoneError() }}</p>
+                }
               </div>
               <div class="form-group full">
                 <label>Delivery Address</label>
@@ -113,7 +117,7 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
             </div>
 
             <button class="btn-place-order" type="submit"
-              [disabled]="submitting() || !paymentMethod() || (paymentMethod() === 'UPI' && !transactionId())">
+              [disabled]="submitting() || !paymentMethod() || !!phoneError() || (paymentMethod() === 'UPI' && !transactionId())">
               {{ submitting() ? 'Placing Order...' : '🎁 Submit & Place Order' }}
             </button>
             @if (error()) {
@@ -201,6 +205,7 @@ import { AppStateService, CartItem, resolveSiteImageUrl } from '../services/app-
     .btn-place-order:hover{background:var(--color-primary-d)}
     .btn-place-order:disabled{opacity:0.5;cursor:not-allowed}
     .error-msg{color:#ef4444;font-size:0.85rem;margin-top:0.5rem}
+    .field-error-msg{color:#ef4444;font-size:0.78rem;margin:0.3rem 0 0}
     @media (max-width:900px){.form-row{grid-template-columns:1fr}}
   `]
 })
@@ -212,6 +217,7 @@ export class CartDrawerComponent {
   orderPlacedSuccess = false;
   submitting = signal(false);
   error = signal('');
+  phoneError = signal(''); 
   paymentMethod = signal<string>('');
   paymentQrImages = signal<string[]>([]);
   paymentDetails = signal<any[]>([]);
@@ -273,6 +279,20 @@ export class CartDrawerComponent {
     this.transactionId.set('');
   }
 
+  /** Phone must be exactly 10 digits, no country code — validated immediately on input. */
+  onPhoneInput(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      this.phoneError.set('Phone number is required.');
+    } else if (!/^\d*$/.test(trimmed)) {
+      this.phoneError.set('Only digits are allowed.');
+    } else if (trimmed.length !== 10) {
+      this.phoneError.set('Phone number must be exactly 10 digits.');
+    } else {
+      this.phoneError.set('');
+    }
+  }
+
   placeOrder(e: Event) {
     e.preventDefault();
     if (this.submitting()) return;
@@ -299,6 +319,13 @@ export class CartDrawerComponent {
 
     if (!name || !phone || !address) {
       this.error.set('All fields are required.');
+      return;
+    }
+
+    // Re-validate phone in case the user pasted text or submitted via Enter
+    this.onPhoneInput(phone);
+    if (this.phoneError()) {
+      this.error.set(this.phoneError());
       return;
     }
 

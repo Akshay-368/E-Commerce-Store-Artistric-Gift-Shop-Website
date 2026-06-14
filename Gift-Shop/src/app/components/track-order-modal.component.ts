@@ -17,10 +17,24 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
         @if (orders().length === 0 && !order()) {
           <p class="track-sub">Enter your Order ID or phone number to check status.</p>
           <div class="track-input-group">
-            <input #idInput placeholder="Order ID (e.g. ORD-2026-X8B9)"
-              (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
-            <input #phoneInput placeholder="Or enter Phone Number"
-              (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+            <div class="track-input-field">
+              <label class="track-input-label" for="track-order-id">Order ID</label>
+              <input id="track-order-id" #idInput placeholder="e.g. ORD-2026-X8B9"
+                (input)="onOrderIdInput(idInput.value)"
+                (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+              @if (orderIdError()) {
+                <p class="field-error-msg">{{ orderIdError() }}</p>
+              }
+            </div>
+            <div class="track-input-field">
+              <label class="track-input-label" for="track-phone">Phone Number</label>
+              <input id="track-phone" #phoneInput placeholder="10-digit mobile number" maxlength="10" inputmode="numeric"
+                (input)="onPhoneInput(phoneInput.value)"
+                (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+              @if (phoneError()) {
+                <p class="field-error-msg">{{ phoneError() }}</p>
+              }
+            </div>
             <button class="btn-track-search" (click)="lookup(idInput.value, phoneInput.value)">Search</button>
           </div>
           @if (searchError()) {
@@ -131,6 +145,20 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
                 (keyup.enter)="sendNote(noteInput.value); noteInput.value = ''" />
               <button class="btn-note" (click)="sendNote(noteInput.value); noteInput.value = ''">Send Note</button>
             </div>
+
+            <!-- Download invoice -->
+            <div class="invoice-row">
+              <button class="btn-invoice" type="button" (click)="downloadInvoice(ord)" [disabled]="downloadingInvoice()">
+                @if (downloadingInvoice()) {
+                  📄 Preparing…
+                } @else {
+                  📄 Download Invoice (PDF)
+                }
+              </button>
+              @if (invoiceError()) {
+                <p class="field-error-msg">{{ invoiceError() }}</p>
+              }
+            </div>
           </div>
         }
       </div>
@@ -145,12 +173,15 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     #track-modal.active .track-card{transform:translateY(0)}
     .track-card h3{font-family:var(--font-display);font-size:1.4rem;color:var(--color-charcoal);margin-bottom:0.3rem}
     .track-sub{font-size:0.88rem;color:var(--color-body);margin-bottom:1rem}
-    .track-input-group{display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem}
-    .track-input-group input{flex:1;min-width:140px;padding:0.7rem 1rem;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.9rem;font-family:var(--font-ui);outline:none;transition:var(--transition)}
+    .track-input-group{display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem;align-items:flex-start}
+    .track-input-field{flex:1;min-width:140px;display:flex;flex-direction:column;gap:0.3rem}
+    .track-input-label{font-size:0.78rem;font-weight:600;color:var(--color-charcoal);letter-spacing:0.02em}
+    .track-input-group input{width:100%;padding:0.7rem 1rem;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.9rem;font-family:var(--font-ui);outline:none;transition:var(--transition);box-sizing:border-box}
     .track-input-group input:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(136,173,53,0.12)}
-    .btn-track-search{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1.3rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition)}
+    .btn-track-search{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1.3rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition);align-self:flex-end;height:42px}
     .btn-track-search:hover{background:var(--color-primary-d)}
     .error-msg{color:#e05454;font-size:0.85rem;margin-top:0.5rem}
+    .field-error-msg{color:#e05454;font-size:0.78rem;margin:0.15rem 0 0}
 
     /* ── Multi-result list ── */
     .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem}
@@ -201,7 +232,14 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     .qr-gallery{display:flex;gap:10px;flex-wrap:wrap}
     .qr-image{width:120px;height:120px;object-fit:contain;border:1px solid var(--color-border);border-radius:8px}
     .oli-badge{padding:0.25rem 0.7rem;border-radius:50px;font-size:0.74rem;font-weight:600;white-space:nowrap}
-    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:12%;right:12%}}
+
+    /* Invoice download */
+    .invoice-row{margin-top:1rem;border-top:1px solid rgba(209,209,209,0.5);padding-top:0.85rem}
+    .btn-invoice{width:100%;background:#fff;color:var(--color-charcoal);border:1.5px solid var(--color-border);padding:0.7rem 1rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition)}
+    .btn-invoice:hover:not(:disabled){border-color:var(--color-primary);color:var(--color-primary)}
+    .btn-invoice:disabled{opacity:0.6;cursor:not-allowed}
+
+    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.btn-track-search{align-self:stretch}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:12%;right:12%}}
   `]
 })
 export class TrackOrderModalComponent implements OnInit {
@@ -212,6 +250,17 @@ export class TrackOrderModalComponent implements OnInit {
   order = signal<Order | null>(null);
   searchError = signal('');
   paymentQrImages = signal<string[]>([]);
+
+  // Field-level validation
+  phoneError = signal('');
+  orderIdError = signal('');
+
+  // Invoice download
+  downloadingInvoice = signal(false);
+  invoiceError = signal('');
+
+  private static readonly PHONE_REGEX = /^\d{10}$/;
+  private static readonly ORDER_ID_REGEX = /^ORD-\d{4}-[A-Za-z0-9]{6}$/;
 
   constructor(private state: AppStateService) {}
 
@@ -240,6 +289,9 @@ export class TrackOrderModalComponent implements OnInit {
     this.orders.set([]);
     this.order.set(null);
     this.searchError.set('');
+    this.phoneError.set('');
+    this.orderIdError.set('');
+    this.invoiceError.set('');
   }
 
   searchAgain() { this.reset(); }
@@ -250,16 +302,48 @@ export class TrackOrderModalComponent implements OnInit {
   /** User tapped an order card in the multi-result list */
   selectOrder(o: Order) { this.order.set(o); }
 
+  // ── Live field validation ────────────────────────────────────────────
+
+  /** Phone: digits only, exactly 10 — error shown immediately while typing. */
+  onPhoneInput(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) { this.phoneError.set(''); return; }
+    if (!/^\d*$/.test(trimmed)) {
+      this.phoneError.set('Only digits are allowed.');
+    } else if (trimmed.length !== 10) {
+      this.phoneError.set('Phone number must be exactly 10 digits.');
+    } else {
+      this.phoneError.set('');
+    }
+  }
+
+  /** Order ID: must match ORD-YYYY-XXXXXX format — error shown immediately while typing. */
+  onOrderIdInput(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) { this.orderIdError.set(''); return; }
+    if (!TrackOrderModalComponent.ORDER_ID_REGEX.test(trimmed.toUpperCase())) {
+      this.orderIdError.set('Order ID should look like ORD-2026-X8B9.');
+    } else {
+      this.orderIdError.set('');
+    }
+  }
+
   lookup(id: string, phone: string) {
     this.searchError.set('');
     const trimmedId    = id?.trim();
     const trimmedPhone = phone?.trim();
 
+    // Re-run validation in case the user pasted text or hit Enter without an input event
+    if (trimmedId) this.onOrderIdInput(trimmedId);
+    if (trimmedPhone) this.onPhoneInput(trimmedPhone);
+
     if (trimmedId) {
+      if (this.orderIdError()) return;
       // Direct order-ID lookup — always shows single detail view
       this.orders.set([]);
-      this.fetchOrder(trimmedId);
+      this.fetchOrder(trimmedId.toUpperCase());
     } else if (trimmedPhone) {
+      if (this.phoneError()) return;
       this.state.findOrderByPhone(trimmedPhone).subscribe({
         next: raw => {
           if (!raw || raw.length === 0) {
@@ -303,6 +387,29 @@ export class TrackOrderModalComponent implements OnInit {
     this.state.addOrderMessageByNumber(ord.publicOrderNumber, text.trim()).subscribe({
       next: msg => this.order.update(o => o ? { ...o, messages: [...o.messages, msg] } : o),
       error: ()  => this.searchError.set('Could not send message.')
+    });
+  }
+
+  // ── Invoice download ────────────────────────────────────────────────
+
+  downloadInvoice(ord: Order) {
+    if (this.downloadingInvoice()) return;
+    this.invoiceError.set('');
+    this.downloadingInvoice.set(true);
+    this.state.getOrderInvoice(ord.publicOrderNumber).subscribe({
+      next: (blob) => {
+        this.downloadingInvoice.set(false);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice-${ord.publicOrderNumber}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.downloadingInvoice.set(false);
+        this.invoiceError.set('Could not download invoice. Please try again.');
+      }
     });
   }
 

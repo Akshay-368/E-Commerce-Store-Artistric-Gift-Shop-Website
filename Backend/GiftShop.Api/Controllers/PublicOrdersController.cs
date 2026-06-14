@@ -1,6 +1,8 @@
+using System.Text.RegularExpressions;
 using GiftShop.Domain.Entities;
 using GiftShop.Domain.Enums;
 using GiftShop.Infrastructure.Persistence;
+using GiftShop.Infrastructure.Services;   // ← added for IPdfInvoiceService
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +13,13 @@ namespace GiftShop.Api.Controllers;
 public sealed class PublicOrdersController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IPdfInvoiceService _pdf;   // ← new field
 
-    public PublicOrdersController(ApplicationDbContext db)
+    // Updated constructor – accepts both dependencies
+    public PublicOrdersController(ApplicationDbContext db, IPdfInvoiceService pdf)
     {
         _db = db;
+        _pdf = pdf;
     }
 
     // ── POST /api/orders ──────────────────────────────────────────────
@@ -29,32 +34,32 @@ public sealed class PublicOrdersController : ControllerBase
 
     public sealed record CreateOrderItem(Guid ProductId, int Quantity);
 
+    // Fixed phone regex: exactly 10 digits
+    private static readonly Regex PhoneRegex = new Regex(@"^\d{10}$");
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest req)
     {
-        // Basic validation
         if (string.IsNullOrWhiteSpace(req.CustomerName) ||
             string.IsNullOrWhiteSpace(req.CustomerPhone) ||
             string.IsNullOrWhiteSpace(req.CustomerAddress))
             return BadRequest(new { error = "Customer name, phone, and address are required." });
 
+        // Phone validation – exactly 10 digits
+        if (!PhoneRegex.IsMatch(req.CustomerPhone.Trim()))
+            return BadRequest(new { error = "Phone number must be exactly 10 digits (no country code or symbols)." });
+
         if (req.Items == null || req.Items.Count == 0)
             return BadRequest(new { error = "Order must contain at least one item." });
         
-        // Additional validation: only UPI or Online allowed
-        // Additional validation: if UPI, transaction ID is required
+        // Only UPI or Online allowed
         if (req.PaymentMethod != PaymentMethod.UPI && req.PaymentMethod != PaymentMethod.Online)
             return BadRequest(new { error = "Payment method must be UPI or Online." });
         if (req.PaymentMethod == PaymentMethod.UPI && string.IsNullOrWhiteSpace(req.TransactionId))
             return BadRequest(new { error = "Transaction ID is required for UPI payments." });
 
-        // Fetch products from DB
+        // Fetch products (workaround for Npgsql bug)
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
-        /* var products = await _db.Products
-            .Where(p => productIds.Contains(p.Id) && p.IsActive)
-            .ToDictionaryAsync(p => p.Id); */
-        // ── Workaround for Npgsql preview bug: fetch all active products,
-        //     then filter in memory instead of using .Contains in query.
         var allActiveProducts = await _db.Products
             .Where(p => p.IsActive)
             .ToListAsync();
@@ -63,11 +68,9 @@ public sealed class PublicOrdersController : ControllerBase
             .Where(p => productIds.Contains(p.Id))
             .ToDictionary(p => p.Id);
 
-        // Validate that all requested products exist and are active
         if (products.Count != productIds.Count)
             return BadRequest(new { error = "One or more products are invalid or unavailable." });
 
-        // Calculate totals & build order items
         decimal subtotal = 0;
         var orderItems = new List<OrderItem>();
 
@@ -87,7 +90,6 @@ public sealed class PublicOrdersController : ControllerBase
             });
         }
 
-        // Example shipping logic: free over ₹1000, else ₹100
         decimal shippingFee = subtotal >= 1000 ? 0 : 100;
         decimal totalAmount = subtotal + shippingFee;
 
@@ -173,6 +175,21 @@ public sealed class PublicOrdersController : ControllerBase
         });
     }
 
+    // ── GET /api/orders/{publicOrderNumber}/invoice ────────────────────
+    [HttpGet("{publicOrderNumber}/invoice")]
+    public async Task<IActionResult> DownloadInvoice(string publicOrderNumber)
+    {
+        var order = await _db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.PublicOrderNumber == publicOrderNumber);
+
+        if (order == null) return NotFound();
+
+        var pdfBytes = _pdf.GenerateInvoice(order);
+        return File(pdfBytes, "application/pdf", $"invoice-{order.PublicOrderNumber}.pdf");
+    }
+
     // ── POST /api/orders/{publicOrderNumber}/messages ─────────────────
     public sealed record AddMessageRequest(string MessageText);
 
@@ -201,56 +218,55 @@ public sealed class PublicOrdersController : ControllerBase
     }
 
     // ── GET /api/orders/by-phone/{phone} ───────────────────────────────
-[HttpGet("by-phone/{phone}")]
-public async Task<IActionResult> GetByPhone(string phone)
-{
-    var orders = await _db.Orders
-        .AsNoTracking()
-        .Include(o => o.Items)
-        .Include(o => o.Messages.OrderBy(m => m.CreatedAt))
-        .Where(o => o.CustomerPhone == phone)
-        .OrderByDescending(o => o.CreatedAt)
-        .ToListAsync();
-
-    if (orders.Count == 0) return NotFound();
-
-    var result = orders.Select(order => new
+    [HttpGet("by-phone/{phone}")]
+    public async Task<IActionResult> GetByPhone(string phone)
     {
-        order.Id,
-        order.PublicOrderNumber,
-        order.CustomerName,
-        order.CustomerPhone,
-        order.CustomerAddress,
-        order.Status,
-        order.PaymentStatus,
-        order.Subtotal,
-        order.ShippingFee,
-        order.TotalAmount,
-        order.TransactionId,
-        order.CreatedAt,
-        order.PaidAt,
-        order.DeliveredAt,
-        Items = order.Items.Select(i => new
-        {
-            i.Id,
-            i.ProductId,
-            i.TitleSnapshot,
-            i.PriceSnapshot,
-            i.Quantity
-        }),
-        Messages = order.Messages.Select(m => new
-        {
-            m.Id,
-            m.Sender,
-            m.MessageText,
-            m.CreatedAt
-        })
-    });
+        var orders = await _db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .Include(o => o.Messages.OrderBy(m => m.CreatedAt))
+            .Where(o => o.CustomerPhone == phone)
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
 
-    return Ok(result);
-}
+        if (orders.Count == 0) return NotFound();
 
-    // ── Helpers ────────────────────────────────────────────────────────
+        var result = orders.Select(order => new
+        {
+            order.Id,
+            order.PublicOrderNumber,
+            order.CustomerName,
+            order.CustomerPhone,
+            order.CustomerAddress,
+            order.Status,
+            order.PaymentStatus,
+            order.Subtotal,
+            order.ShippingFee,
+            order.TotalAmount,
+            order.TransactionId,
+            order.CreatedAt,
+            order.PaidAt,
+            order.DeliveredAt,
+            Items = order.Items.Select(i => new
+            {
+                i.Id,
+                i.ProductId,
+                i.TitleSnapshot,
+                i.PriceSnapshot,
+                i.Quantity
+            }),
+            Messages = order.Messages.Select(m => new
+            {
+                m.Id,
+                m.Sender,
+                m.MessageText,
+                m.CreatedAt
+            })
+        });
+
+        return Ok(result);
+    }
+
     private static string GenerateOrderNumber()
         => $"ORD-{DateTime.UtcNow.Year}-{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
 }
