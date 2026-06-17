@@ -792,6 +792,7 @@ export class AdminHomepageComponent implements OnInit {
         this.newPayment = { key: '', value: '' };
         this.savingPayment.set(false);
         this.appState.loadSiteContent();
+        this.appState.loadPaymentDetails();
       },
       error: () => {
         this.savingPayment.set(false);
@@ -819,6 +820,7 @@ export class AdminHomepageComponent implements OnInit {
         this.cancelEditPayment();
         this.savingPayment.set(false);
         this.appState.loadSiteContent();
+        this.appState.loadPaymentDetails();
       },
       error: () => {
         this.savingPayment.set(false);
@@ -832,6 +834,7 @@ export class AdminHomepageComponent implements OnInit {
       next: () => {
         this.loadPaymentDetails();
         this.appState.loadSiteContent();
+        this.appState.loadPaymentDetails();
       },
       error: () => this.globalError.set('Failed to delete payment detail.')
     });
@@ -842,6 +845,7 @@ export class AdminHomepageComponent implements OnInit {
       next: () => {
         this.loadPaymentDetails();
         this.appState.loadSiteContent();
+        this.appState.loadPaymentDetails();
       },
       error: () => this.globalError.set('Failed to toggle payment detail.')
     });

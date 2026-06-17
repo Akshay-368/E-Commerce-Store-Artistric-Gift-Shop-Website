@@ -169,8 +169,13 @@ export class AppStateService {
 
     
       // Load real data from the API on boot from db.
-      this.loadProducts();
-      this.loadSiteContent();
+      if (this.isBrowser){
+        this.loadProducts();
+        this.loadSiteContent();
+        this.loadSocialLinks();
+        this.loadPaymentDetails();
+        // adding the this.isbrowser check because due to ssr when the server was doing the calls first ,it was passing empty array for payment information which leads to not rendering of any added payment information alongside the qr image in cart-drawer component of the order bag.
+      }
 
   }
   loadSocialLinks() {
