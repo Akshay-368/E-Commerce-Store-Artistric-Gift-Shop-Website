@@ -293,14 +293,14 @@ export class AdminOrdersComponent implements OnInit {
   selectedStatus = '';
   transactionIdInput = '';
 
-  // Shared singleton — used so the sidebar badge updates instantly
-  // whenever an order is marked seen here, and so the "↻ Refresh" button
-  // here also refreshes the badge's order list (picks up new orders).
-  ordersState = inject(AdminOrdersStateService);
+  // ── Shared singleton: badge in the shell and seen state here are the
+  //    SAME signal. Any markSeen()/markAllSeen() call instantly updates
+  //    the sidebar badge — no logout/login needed.
+  private ordersState = inject(AdminOrdersStateService);
 
-  unseenCount = computed(() => {
-    return this.orders().filter(o => this.ordersState.isUnseen(o.id)).length;
-  });
+  unseenCount = computed(() =>
+    this.orders().filter(o => this.ordersState.isUnseen(o.id)).length
+  );
 
   constructor(private api: AdminApiService) {}
 
@@ -314,15 +314,15 @@ export class AdminOrdersComponent implements OnInit {
         this.orders.set(res.items);
         this.total.set(res.total);
         this.loading.set(false);
+        // Also refresh the service's known-order list so the badge reflects
+        // any brand-new orders that arrived since last load.
+        this.ordersState.refresh();
       },
       error: () => {
         this.error.set('Could not load orders.');
         this.loading.set(false);
       }
     });
-    // Refresh the shared badge state too, so a manual refresh here also
-    // surfaces any brand-new orders in the sidebar badge immediately.
-    this.ordersState.refresh();
   }
 
   isUnseen(id: string): boolean {
@@ -330,6 +330,7 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   markSeen(id: string) {
+    // Writes to the shared signal → shell badge updates immediately in same render
     this.ordersState.markSeen(id);
   }
 
