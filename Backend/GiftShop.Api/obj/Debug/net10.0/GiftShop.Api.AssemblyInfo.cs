@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GiftShop.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+927100e08326946a0509cc1152697571b633ab28")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+11f1e8efb8f44be9e2407c5c8a7d3bdbd8cc82e1")]
 [assembly: System.Reflection.AssemblyProductAttribute("GiftShop.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GiftShop.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

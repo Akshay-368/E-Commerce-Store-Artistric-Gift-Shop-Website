@@ -63,7 +63,7 @@ const SECTIONS: SectionDef[] = [
     ]
   },
   {
-    key: 'footer', label: '🦶 Footer', sectionName: 'footer', hasImages: false,
+    key: 'footer', label: '🦶 Footer', sectionName: 'footer', hasImages: true,
     textFields: [
       { key: 'footer.brandName',        label: 'Footer brand name',                               placeholder: 'Kalakaari Gifting' },
       { key: 'footer.brandTagline',     label: 'Footer brand tagline',                            placeholder: 'Where Creativity Becomes a Gift' },

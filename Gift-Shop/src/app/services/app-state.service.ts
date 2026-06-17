@@ -36,6 +36,7 @@ export interface ProductItem {
  * For Text items : textValue holds the copy.
  * Non-product section images served as binary from the DB */
 export interface SiteContentItem {
+  isActive: boolean;
   id: string;
   contentKey: string;
   sectionName: string;

@@ -76,11 +76,11 @@ export class NavbarComponent implements OnInit {
       this.orderBagLabel      = t('navbar.orderBag',      '🛍️ Order Bag');
 
       // Dynamic logo: look for an image with contentKey 'navbar.logo'
-      const logoItem = items.find(i => i.contentKey === 'navbar.logo' && i.kind === 'Image');
-      if (logoItem && logoItem.imageUrl) {
-        this.logoSrc = resolveSiteImageUrl(logoItem.imageUrl);
+      const navbarImages = items.filter(i => i.sectionName === 'navbar' && i.kind === 'Image')
+                                .sort((a, b) => a.sortOrder - b.sortOrder);
+      if (navbarImages.length > 0 && navbarImages[0].imageUrl) {
+        this.logoSrc = resolveSiteImageUrl(navbarImages[0].imageUrl);
       } else {
-        // Keep the default fallback if no logo image is set
         this.logoSrc = '/assets/Artistry-Giftopia-300x300.png';
       }
     });

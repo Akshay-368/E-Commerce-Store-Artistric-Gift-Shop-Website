@@ -191,7 +191,8 @@ export interface HighlightCard { icon: string; title: string; body: string; }
         <div class="footer-top">
           <!-- Brand block -->
           <div class="footer-brand">
-            <img src="/assets/Artistry-Giftopia-300x300.png" [alt]="footerBrandName" />
+            <img [src]="footerLogoSrc" [alt]="footerBrandName" />
+            <!-- <img src="/assets/Artistry-Giftopia-300x300.png" [alt]="footerBrandName" /> -->
             <div class="footer-brand-text">
               <strong>{{ footerBrandName }}</strong>
               <span>{{ footerBrandTagline }}</span>
@@ -407,6 +408,7 @@ export class HomeComponent implements OnInit {
   highlightCards: HighlightCard[] = DEFAULT_HIGHLIGHTS;
 
   // Footer
+  footerLogoSrc = '/assets/Artistry-Giftopia-300x300.png';
   footerBrandName = 'Kalakaari Gifting';
   footerBrandTagline = 'Where Creativity Becomes a Gift';
   footerCopy = 'Curating smiles and celebrating sweet connections since 2024. Made locally with love. 💚';
@@ -472,6 +474,13 @@ export class HomeComponent implements OnInit {
         this.highlightCards = DEFAULT_HIGHLIGHTS;
       }
 
+      const footerImages = items
+                                .filter(i => i.sectionName === 'footer' && i.kind === 'Image' )
+                                .sort((a,b) => a.sortOrder - b.sortOrder);
+      if (footerImages.length > 0 && footerImages[0].imageUrl){
+        this.footerLogoSrc = resolveSiteImageUrl(footerImages[0].imageUrl);
+      }
+
       // Footer text fields
       this.footerBrandName    = this.getText(items, 'footer.brandName')    ?? 'Kalakaari Gifting';
       this.footerBrandTagline = this.getText(items, 'footer.brandTagline') ?? 'Where Creativity Becomes a Gift';
@@ -490,6 +499,8 @@ export class HomeComponent implements OnInit {
       this.contactSocials = links; // links array with { icon, name, url, ... }
       this.cdr.markForCheck();
     });
+
+
 
     // Fallback timeout
     setTimeout(() => {
