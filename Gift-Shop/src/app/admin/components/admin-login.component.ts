@@ -1,10 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdminAuthService } from '../services/admin-auth.service';
 
-// Three stages: pre-auth key → TOTP code → username/password
+// Three stages (or two if TOTP is disabled): pre-auth key → [TOTP code] → username/password
 type Stage = 'preauth' | 'totp' | 'login';
 
 @Component({
@@ -26,7 +26,7 @@ type Stage = 'preauth' | 'totp' | 'login';
           <p>Kalakaari Gifting — Internal Access Only</p>
         </div>
 
-        <!-- 3-step stage indicator -->
+        <!-- Stage indicator: 3 steps when TOTP enabled, 2 when disabled -->
         <div class="stage-indicator">
           <div class="stage-step"
             [class.active]="stage() === 'preauth'"
@@ -34,16 +34,18 @@ type Stage = 'preauth' | 'totp' | 'login';
             <span class="step-num">{{ (stage() === 'totp' || stage() === 'login') ? '✓' : '1' }}</span>
             <span>Access Key</span>
           </div>
-          <div class="stage-divider"></div>
-          <div class="stage-step"
-            [class.active]="stage() === 'totp'"
-            [class.done]="stage() === 'login'">
-            <span class="step-num">{{ stage() === 'login' ? '✓' : '2' }}</span>
-            <span>Authenticator</span>
-          </div>
+          @if (totpEnabled()) {
+            <div class="stage-divider"></div>
+            <div class="stage-step"
+              [class.active]="stage() === 'totp'"
+              [class.done]="stage() === 'login'">
+              <span class="step-num">{{ stage() === 'login' ? '✓' : '2' }}</span>
+              <span>Authenticator</span>
+            </div>
+          }
           <div class="stage-divider"></div>
           <div class="stage-step" [class.active]="stage() === 'login'">
-            <span class="step-num">3</span>
+            <span class="step-num">{{ totpEnabled() ? '3' : '2' }}</span>
             <span>Credentials</span>
           </div>
         </div>
@@ -210,9 +212,10 @@ type Stage = 'preauth' | 'totp' | 'login';
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
-export class AdminLoginComponent implements OnDestroy {
-  stage       = signal<Stage>('preauth');
-  loading     = signal(false);
+export class AdminLoginComponent implements OnInit, OnDestroy {
+  stage        = signal<Stage>('preauth');
+  totpEnabled  = signal(true);   // fetched from server on init
+  loading      = signal(false);
   errorMsg    = signal('');
   successMsg  = signal('');
   showKey     = signal(false);
@@ -228,6 +231,14 @@ export class AdminLoginComponent implements OnDestroy {
 
   constructor(private authSvc: AdminAuthService, private router: Router) {
     this.syncCooldown();
+  }
+
+  ngOnInit() {
+    // Check TOTP status once on load so we know how many stages to show
+    this.authSvc.getTotpStatus().subscribe({
+      next: (res) => this.totpEnabled.set(res.totpEnabled),
+      error: ()    => this.totpEnabled.set(true) // safe default: assume TOTP required
+    });
   }
 
   ngOnDestroy() {
@@ -279,9 +290,16 @@ export class AdminLoginComponent implements OnDestroy {
     this.authSvc.verifyPreAuthKey(this.secretKey).subscribe({
       next: () => {
         this.loading.set(false);
-        this.successMsg.set('Access key verified. Enter your authenticator code.');
-        this.stage.set('totp');
-        this.syncCooldown('totp');
+        if (this.totpEnabled()) {
+          this.successMsg.set('Access key verified. Enter your authenticator code.');
+          this.stage.set('totp');
+          this.syncCooldown('totp');
+        } else {
+          // TOTP is disabled — skip straight to credentials
+          this.successMsg.set('Access key verified. Enter your credentials.');
+          this.stage.set('login');
+          this.syncCooldown('login');
+        }
       },
       error: (err) => {
         this.loading.set(false);

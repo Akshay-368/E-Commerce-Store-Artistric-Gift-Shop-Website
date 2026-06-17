@@ -306,3 +306,12 @@ public sealed class PaymentDetail : EntityBase
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
 }
+
+public sealed class AdminSetting : EntityBase
+{
+    [MaxLength(120)]
+    public string Key { get; set; } = string.Empty;   // e.g. "IsTotpEnabled"
+
+    [MaxLength(500)]
+    public string Value { get; set; } = string.Empty;  // e.g. "true" or "false"
+}

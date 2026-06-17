@@ -440,6 +440,19 @@ using (var scope = app.Services.CreateScope())
             await context.SaveChangesAsync();
             logger.LogInformation("[Startup] Default admin user seeded.");
         }
+
+        // Adding IsTotpEnabled setting to db with default value as true .
+        if (!await context.AdminSettings.AnyAsync(s => s.Key == "IsTotpEnabled"))
+        {
+            context.AdminSettings.Add(new AdminSetting
+            {
+               Key = "IsTotpEnabled" ,
+               Value = "true" // TOTP enabled by default, matching previous behaviour.
+            });
+
+            await context.SaveChangesAsync();
+            logger.LogInformation("[Startup] Default AdminSetting 'IsTotpEnabled seeded");
+        }
     }
     catch (Exception ex)
     {

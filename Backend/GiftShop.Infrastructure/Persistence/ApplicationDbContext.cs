@@ -37,6 +37,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<SocialLink> SocialLinks => Set<SocialLink>();
     public DbSet<PaymentDetail> PaymentDetails => Set<PaymentDetail>();
 
+    public DbSet<AdminSetting> AdminSettings => Set<AdminSetting>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -158,6 +160,13 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             entity.HasIndex(x => x.Key).IsUnique();
             entity.Property(x => x.Key).HasMaxLength(120);
+        });
+
+        modelBuilder.Entity<AdminSetting>(entity =>
+        {
+            entity.HasIndex(x => x.Key).IsUnique();
+            entity.Property(x => x.Key).IsRequired();
+            entity.Property(x => x.Value).IsRequired();
         });
 
     }

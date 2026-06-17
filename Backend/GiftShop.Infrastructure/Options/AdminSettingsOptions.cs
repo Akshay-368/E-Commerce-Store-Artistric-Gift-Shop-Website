@@ -16,6 +16,16 @@ public sealed class AdminSettingsOptions
     /// </summary>
     public string? TotpSecret { get; set; }
 
+    /// <summary>
+    /// Whether the TOTP stage (Stage 2) is required during admin login.
+    /// Defaults to true. Can be toggled from the Security page inside the
+    /// admin portal — requires supplying a valid TOTP code to change, so the
+    /// secret must be set up before disabling.
+    /// When false the login flow goes: Pre-auth key → Credentials (2 stages).
+    /// When true  the login flow goes: Pre-auth key → TOTP → Credentials (3 stages).
+    /// </summary>
+    // public bool IsTotpEnabled { get; set; } = true;
+
     public string? AdminUserName { get; set; }
 
     public string? AdminPassword { get; set; }

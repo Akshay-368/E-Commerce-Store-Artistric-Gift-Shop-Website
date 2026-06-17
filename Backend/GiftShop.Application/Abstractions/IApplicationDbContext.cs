@@ -27,5 +27,7 @@ public interface IApplicationDbContext
 
     DbSet<SystemAuditLog> SystemAuditLogs { get; }
 
+    DbSet<AdminSetting> AdminSettings { get; }
+    
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

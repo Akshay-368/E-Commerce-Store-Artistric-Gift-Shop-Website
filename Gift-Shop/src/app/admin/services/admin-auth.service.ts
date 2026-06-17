@@ -150,4 +150,27 @@ export class AdminAuthService {
     if (remaining === 0 && lockUntil > 0) localStorage.removeItem(key);
     return remaining;
   }
+
+  // ── Security: TOTP toggle ────────────────────────────────────────────
+
+  /** Checks whether the TOTP login stage is currently enabled on the server. */
+  getTotpStatus(): Observable<{ totpEnabled: boolean }> {
+    return this.http.get<{ totpEnabled: boolean }>(`${API}/api/admin/totp-status`);
+  }
+
+  /**
+   * Toggles TOTP on/off.
+   * Requires: valid JWT session + exact confirmation phrase + fresh TOTP code.
+   */
+  toggleTotp(confirmationPhrase: string, totpCode: string): Observable<any> {
+    const headers = new HttpHeaders({
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${this.getToken()}`,
+    });
+    return this.http.post<any>(
+      `${API}/api/admin/totp-toggle`,
+      { confirmationPhrase, totpCode },
+      { headers }
+    );
+  }
 }
