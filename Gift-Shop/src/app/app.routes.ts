@@ -9,7 +9,8 @@ import { AdminDashboardComponent } from './admin/pages/admin-dashboard.component
 import { AdminHomepageComponent } from './admin/pages/admin-homepage.component';
 import { AdminInvoicesComponent } from './admin/pages/admin-invoices.component';
 import { AdminMediaComponent } from './admin/pages/admin-media.component';
-import { AdminOrdersComponent } from './admin/pages/admin-orders.component';
+//import { AdminOrdersComponent } from './admin/pages/admin-orders.component';
+import { AdminOrdersComponent } from './admin/components/admin-orders.component';
 import { AdminPaymentsComponent } from './admin/pages/admin-payments.component';
 import { AdminProductsComponent } from './admin/pages/admin-products.component';
 import { AdminReviewsComponent } from './admin/pages/admin-reviews.component';
