@@ -7,6 +7,7 @@ import { FormsModule } from '@angular/forms';
 import {
   AppStateService, ProductItem, SiteContentItem, resolveSiteImageUrl
 } from '../services/app-state.service';
+import { TelemetryService } from '../services/telemetry.service';
 import { ProductCardComponent } from './product-card.component';
 import { SectionSlideshowComponent } from './section-slideshow.component';
 
@@ -426,7 +427,8 @@ export class HomeComponent implements OnInit {
 
   constructor(
     private state: AppStateService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private telemetry: TelemetryService
   ) {}
 
   ngOnInit(): void {
@@ -542,9 +544,15 @@ export class HomeComponent implements OnInit {
     return this.filteredProducts.length > this.displayedCount;
   }
 
-  onSearch(v: string): void { this.searchQuery = v; this.displayedCount = 8; }
-  onFilter(v: string): void { this.selectedCategory = v; this.displayedCount = 8; }
-  loadMore(): void { this.displayedCount += 8; }
+  onSearch(v: string): void { 
+    this.searchQuery = v; 
+    this.displayedCount = 8; 
+    if (v && v.trim().length> 0) {
+      this.telemetry.trackUserAction('Someone searched for ' , v.trim());
+    }
+  }
+  onFilter(v: string): void { this.selectedCategory = v; this.displayedCount = 8; this,this.telemetry.trackUserAction('Someone applied a filter with the category as :' , this.selectedCategory ?? 'unkown'); }
+  loadMore(): void { this.displayedCount += 8; this.telemetry.trackUserAction('Someone loaded more products and set the displayed count to' , this.displayedCount.toString() ?? 'unkown');}
   trackById(_: number, p: ProductItem): string { return p.id; }
   scrollTo(id: string): void { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
 

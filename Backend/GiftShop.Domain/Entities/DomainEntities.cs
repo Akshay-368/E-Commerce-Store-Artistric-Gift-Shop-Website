@@ -276,7 +276,22 @@ public sealed class SystemAuditLog : EntityBase
 
     [MaxLength(240)]
     public string? UserName { get; set; }
+
+    [MaxLength(45)]
+    public string? RemoteIpAddress { get; set; }
+
+    [MaxLength(45)]
+    public string? ForwardedFor { get; set; }
+
+    [MaxLength(500)]
+    public string? UserAgent { get; set; }
+
+    [MaxLength(1000)]
+    public string? Description { get; set; }
 }
+
+// Telemetry ping record for  ping endponint in program.cs to utilise.
+public record TelemetryPing(string Action, string Metadata);
 
 // ... existing code ...
 

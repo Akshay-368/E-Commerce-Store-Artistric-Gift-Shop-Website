@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { AppStateService, ProductImage, ProductItem } from '../services/app-state.service';
-
+import { TelemetryService } from '../services/telemetry.service';
 @Component({
   selector: 'app-product-detail-drawer',
   standalone: true,
@@ -128,7 +128,7 @@ export class ProductDetailDrawerComponent {
   quantity = 1;
   activeImageIndex = 0;
 
-  constructor(private state: AppStateService) {
+  constructor(private state: AppStateService , private telemetry : TelemetryService) {
     this.state.selectedProduct$.subscribe(p => {
       this.product = p;
       this.quantity = 1;
@@ -159,11 +159,17 @@ export class ProductDetailDrawerComponent {
 
   nextImage(): void {
     this.activeImageIndex = (this.activeImageIndex + 1) % this.allImages.length;
+    this.telemetry.trackUserAction('Someone is viewing the image' , this.activeImageIndex.toString() ?? 'unkown');
   }
 
   goToImage(i: number): void { this.activeImageIndex = i; }
 
   close() { this.state.closeProduct(); }
-  changeQty(delta: number) { this.quantity = Math.max(1, this.quantity + delta); }
-  addToCart() { if (this.product) { this.state.addToCart(this.product, this.quantity); } }
+  changeQty(delta: number) { this.quantity = Math.max(1, this.quantity + delta); this.telemetry.trackUserAction('Someone increased the quantity of the product' , this.product?.title ?? 'unkown');}
+  addToCart() {
+     if (this.product) { 
+      this.state.addToCart(this.product, this.quantity);
+       this.telemetry.trackUserAction('Someone added something to their cart, product -', this.product?.title ?? 'unkown' );
+      }
+    }
 }

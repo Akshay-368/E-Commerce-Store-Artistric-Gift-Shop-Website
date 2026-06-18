@@ -42,5 +42,9 @@ public enum AuditActionType
     CreateTable = 6,
     AlterTable = 7,
     DropTable = 8,
-    TruncateTable = 9
+    TruncateTable = 9,
+    DashboardActivity = 10,
+    TelemetryPing = 11,
+    DashboardDeletionAttempt = 12,
+    DashboardInvalidTotp = 13
 }

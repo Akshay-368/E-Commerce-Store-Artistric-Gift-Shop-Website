@@ -297,5 +297,20 @@ deletePaymentDetail(id: string): Observable<void> {
 togglePaymentDetail(id: string): Observable<any> {
   return this.http.put(`${API}/api/admin/payment-details/${id}/toggle`, {}, { headers: this.headers() });
 }
+// Dashboard activity logs
+getActivityLogs(page: number = 1, pageSize: number = 50): Observable<any> {
+  return this.http.get<any>(`${API}/api/admin/dashboard/activity?page=${page}&pageSize=${pageSize}`, { headers: this.headers() });
+}
+
+deleteActivityLogs(ids: string[] | null, totpCode: string, confirmationText: string): Observable<any> {
+  return this.http.delete<any>(`${API}/api/admin/dashboard/activity`, {
+    headers: this.headers(),
+    body: { ids, totpCode, confirmationText }
+  });
+}
+
+getDatabaseSize(): Observable<{ size: string }> {
+  return this.http.get<{ size: string }>(`${API}/api/admin/dashboard/database-size`, { headers: this.headers() });
+}
 
 }

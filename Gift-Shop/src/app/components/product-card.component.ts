@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { AppStateService, ProductItem } from '../services/app-state.service';
+import { TelemetryService } from '../services/telemetry.service';
 
 @Component({
   selector: 'app-product-card',
@@ -77,7 +78,7 @@ export class ProductCardComponent implements OnInit, OnDestroy {
   get displayImages() { return this.product.images ?? []; }
   get hasMultipleImages() { return this.displayImages.length > 1; }
 
-  constructor(private state: AppStateService) {}
+  constructor(private state: AppStateService , private telemetry: TelemetryService) {}
 
   ngOnInit(): void {
     if (this.hasMultipleImages) {
@@ -92,5 +93,5 @@ export class ProductCardComponent implements OnInit, OnDestroy {
   }
 
   goToSlide(i: number): void { this.activeSlide = i; }
-  openDetails() { this.state.openProduct(this.product); }
+  openDetails() { this.state.openProduct(this.product); this.telemetry.trackUserAction('Someone is viewing the details of the product -', this.product?.title ?? 'unkown');}
 }

@@ -59,6 +59,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // TOTP verification service for the admin 3-stage login pipeline
 builder.Services.AddSingleton<IAdminTotpService, AdminTotpService>();
 
+// Dashboard Activity service for the admin , being registered in here
+builder.Services.AddScoped<IDashboardActivityService, DashboardActivityService>();
+
 // CORS — allow Angular dev server and production origin
 builder.Services.AddCors(options =>
 {
@@ -167,6 +170,19 @@ app.UseWhen(
     context => context.Request.Path.StartsWithSegments("/api/admin"),
     adminBranch => adminBranch.UseMiddleware<AdminIpWhitelistMiddleware>()
 );
+
+app.UseMiddleware<DashboardActivityMiddleware>(); // adding new custom built middleware for dashboard activity services to get showed in the dashboard.
+//  the telemetry ping minimal API endpoint
+// Telemetry ping endpoint (202 Accepted)
+app.MapPost("/api/monitoring/ping", async (TelemetryPing ping, HttpContext context, IDashboardActivityService activityService) =>
+{
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+    var userAgent = context.Request.Headers["User-Agent"].FirstOrDefault();
+    var description = $"{ping.Action}: {ping.Metadata}";
+    await activityService.LogActivityAsync(ip, forwardedFor, userAgent, description, AuditActionType.TelemetryPing);
+    return Results.Accepted();
+});
 
 app.MapControllers();
 
