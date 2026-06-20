@@ -313,4 +313,23 @@ getDatabaseSize(): Observable<{ size: string }> {
   return this.http.get<{ size: string }>(`${API}/api/admin/dashboard/database-size`, { headers: this.headers() });
 }
 
+// DELETE /api/admin/orders (sends body with { ids })
+ // ── Order deletion (bulk) ──────────────────────────────────────────
+  /**
+   * Bulk delete orders. Only Delivered or Failed-payment orders are eligible.
+   * Body: { ids: string[] }
+   * Returns: { deleted: number, skipped: string[], message: string }
+   */
+  deleteOrders(ids: string[]): Observable<{ deleted: number; skipped: string[]; message: string }> {
+    return this.handle(
+      this.http.delete<{ deleted: number; skipped: string[]; message: string }>(
+        `${API}/api/admin/orders`,
+        {
+          headers: this.headers(),
+          body: { ids }
+        }
+      )
+    );
+  
+  }
 }

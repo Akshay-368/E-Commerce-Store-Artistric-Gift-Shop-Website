@@ -163,6 +163,99 @@ public sealed class AdminOrdersController : ControllerBase
         return File(pdfBytes, "application/pdf", $"invoice-{order.PublicOrderNumber}.pdf");
     }
 
+
+    // ── DELETE /api/admin/orders (bulk, single, or all-completed) ─────────────
+    /// <summary>
+    /// Deletes one or more orders. Only orders with status Delivered OR payment
+    /// status Failed are eligible — active/in-flight orders cannot be deleted.
+    ///
+    /// Request body:
+    ///   ids      – array of order GUIDs to delete (required, 1–200 items)
+    ///
+    /// Cascade behaviour (all handled by EF Core / DB):
+    ///   OrderItems   → Cascade delete  (frees the Product FK restriction so
+    ///                                   the product can then be deleted/re-used)
+    ///   OrderMessages → Cascade delete
+    ///   Reviews       → Cascade delete
+    ///
+    /// Returns a summary: how many were deleted and how many were skipped
+    /// (because they were not in a deletable state).
+    /// </summary>
+    public sealed record BulkDeleteOrdersRequest(List<Guid> Ids);
+
+[HttpDelete]
+public async Task<IActionResult> BulkDelete([FromBody] BulkDeleteOrdersRequest req)
+{
+    if (req.Ids == null || req.Ids.Count == 0)
+        return BadRequest(new { error = "At least one order ID is required." });
+
+    if (req.Ids.Count > 200)
+        return BadRequest(new { error = "Cannot delete more than 200 orders at once." });
+
+    // We avoid any .Contains in EF queries because of Npgsql preview bugs.
+    // Instead we fetch each order individually (max 200, perfectly fine).
+
+    var deletableIds = new List<Guid>();
+    var skippedNumbers = new List<string>();
+
+    foreach (var id in req.Ids)
+    {
+        // Minimal query – only get what we need for eligibility check
+        var info = await _db.Orders
+            .Where(o => o.Id == id)
+            .Select(o => new { o.Id, o.PublicOrderNumber, o.Status, o.PaymentStatus })
+            .FirstOrDefaultAsync();
+
+        if (info == null)
+        {
+            skippedNumbers.Add($"unknown-{id.ToString().Substring(0, 8)}");
+            continue;
+        }
+
+        if (info.Status == OrderStatus.Delivered || info.PaymentStatus == PaymentStatus.Failed || info.Status == OrderStatus.Cancelled)
+        {
+            deletableIds.Add(info.Id);
+        }
+        else
+        {
+            skippedNumbers.Add(info.PublicOrderNumber);
+        }
+    }
+
+    if (deletableIds.Count == 0)
+    {
+        return BadRequest(new
+        {
+            error = "None of the selected orders are eligible for deletion.",
+            skipped = skippedNumbers,
+            message = "Only orders with status Delivered, Cancelled, or payment status Failed can be deleted."
+        });
+    }
+
+    // Load the full entities for deletion (cascade will handle OrderItems, Messages, Reviews)
+    var ordersToDelete = new List<Order>();
+    foreach (var id in deletableIds)
+    {
+        var order = await _db.Orders.FindAsync(id);
+        if (order != null)
+        {
+            ordersToDelete.Add(order);
+        }
+    }
+
+    _db.Orders.RemoveRange(ordersToDelete);
+    await _db.SaveChangesAsync();
+
+    return Ok(new
+    {
+        deleted = ordersToDelete.Count,
+        skipped = skippedNumbers,
+        message = skippedNumbers.Count > 0
+            ? $"Deleted {ordersToDelete.Count} order(s). Skipped {skippedNumbers.Count} order(s) that were not in a deletable state."
+            : $"Successfully deleted {ordersToDelete.Count} order(s)."
+    });
+}
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     private static bool IsValidTransition(OrderStatus current, OrderStatus next)
