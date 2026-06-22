@@ -15,28 +15,65 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
 
         <!-- ── Search form (shown when no results yet) ── -->
         @if (orders().length === 0 && !order()) {
-          <p class="track-sub">Enter your Order ID or phone number to check status.</p>
-          <div class="track-input-group">
+          <!-- Tab bar -->
+          <div class="tabs-row">
+            <button class="tab-btn"
+                    [class.active-tab]="activeTab() === 'order'"
+                    (click)="activeTab.set('order')">
+              Order ID
+            </button>
+            <button class="tab-btn"
+                    [class.active-tab]="activeTab() === 'phone'"
+                    (click)="activeTab.set('phone')">
+              Phone Number
+            </button>
+            <!-- Info icon (always visible while search form is shown) -->
+            <span class="info-icon-wrapper" (click)="infoOpen.set(!infoOpen())" title="How search works">
+              <span class="info-icon">ℹ️</span>
+            </span>
+          </div>
+
+          <!-- Info tooltip -->
+          @if (infoOpen()) {
+            <div class="info-tooltip">
+              <strong>Search preference:</strong><br>
+              If you provide <strong>both</strong> Order ID and Phone Number, the system will first try to look up your Order ID. If that doesn’t match any order, it will automatically fall back to a phone number search. If neither works, you’ll see a “not found” message.
+            </div>
+          }
+
+          <!-- Order ID input (only when active tab = order) -->
+          @if (activeTab() === 'order') {
             <div class="track-input-field">
               <label class="track-input-label" for="track-order-id">Order ID</label>
-              <input id="track-order-id" #idInput placeholder="e.g. ORD-2026-X8B9"
-                (input)="onOrderIdInput(idInput.value)"
-                (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+              <input id="track-order-id"
+                     [value]="orderIdInput()"
+                     (input)="onOrderIdInput($any($event.target).value)"
+                     (keyup.enter)="lookup()"
+                     placeholder="e.g. ORD-2026-X8B9" />
               @if (orderIdError()) {
                 <p class="field-error-msg">{{ orderIdError() }}</p>
               }
             </div>
+          }
+
+          <!-- Phone input (only when active tab = phone) -->
+          @if (activeTab() === 'phone') {
             <div class="track-input-field">
               <label class="track-input-label" for="track-phone">Phone Number</label>
-              <input id="track-phone" #phoneInput placeholder="10-digit mobile number" maxlength="10" inputmode="numeric"
-                (input)="onPhoneInput(phoneInput.value)"
-                (keyup.enter)="lookup(idInput.value, phoneInput.value)" />
+              <input id="track-phone"
+                     [value]="phoneInput()"
+                     (input)="onPhoneInput($any($event.target).value)"
+                     (keyup.enter)="lookup()"
+                     inputmode="numeric"
+                     maxlength="10"
+                     placeholder="10-digit mobile number" />
               @if (phoneError()) {
                 <p class="field-error-msg">{{ phoneError() }}</p>
               }
             </div>
-            <button class="btn-track-search" (click)="lookup(idInput.value, phoneInput.value)">Search</button>
-          </div>
+          }
+
+          <button class="btn-track-search" (click)="lookup()">Search</button>
           @if (searchError()) {
             <p class="error-msg">{{ searchError() }}</p>
           }
@@ -64,10 +101,9 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
           </div>
         }
 
-        <!-- ── Single order detail (either direct lookup or selected from list) ── -->
+        <!-- ── Single order detail ── -->
         @if (order(); as ord) {
           <div class="track-result show">
-            <!-- Back button when coming from a multi-result list -->
             @if (orders().length > 1) {
               <button class="btn-search-again" (click)="backToList()">← All Orders</button>
             } @else {
@@ -84,22 +120,20 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               </span>
             </div>
 
-            <!-- Payment Failed banner -->
             @if (ord.paymentStatus === 'Failed') {
               <div class="payment-failed-banner">
                 ⚠️ Payment marked as <strong>Failed</strong> by the store. Please contact us to resolve this.
               </div>
             }
 
-            <!-- Timeline -->
             <div class="track-timeline">
               <div class="track-step done">
                 <div class="track-step-dot"></div>
                 <div class="track-step-label">Order Placed</div>
               </div>
               <div class="track-step"
-                [class.done]="isPaymentVerified(ord)"
-                [class.failed]="ord.paymentStatus === 'Failed'">
+                   [class.done]="isPaymentVerified(ord)"
+                   [class.failed]="ord.paymentStatus === 'Failed'">
                 <div class="track-step-dot"></div>
                 <div class="track-step-label">{{ ord.paymentStatus === 'Failed' ? 'Payment Failed' : 'Payment Verified' }}</div>
               </div>
@@ -117,7 +151,6 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               </div>
             </div>
 
-            <!-- Payment QR codes -->
             @if (ord.status === 'PendingPayment' && ord.paymentStatus !== 'Failed' && paymentQrImages().length > 0) {
               <div class="payment-section">
                 <h4>Complete Your Payment</h4>
@@ -130,7 +163,6 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               </div>
             }
 
-            <!-- Messages -->
             <div class="timeline-messages">
               @for (msg of ord.messages; track msg.id) {
                 <div class="msg">
@@ -139,25 +171,17 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
               }
             </div>
 
-            <!-- Send note -->
             <div class="note-row">
               <input #noteInput placeholder="Type a note to the owner..."
-                (keyup.enter)="sendNote(noteInput.value); noteInput.value = ''" />
+                     (keyup.enter)="sendNote(noteInput.value); noteInput.value = ''" />
               <button class="btn-note" (click)="sendNote(noteInput.value); noteInput.value = ''">Send Note</button>
             </div>
 
-            <!-- Download invoice -->
             <div class="invoice-row">
               <button class="btn-invoice" type="button" (click)="downloadInvoice(ord)" [disabled]="downloadingInvoice()">
-                @if (downloadingInvoice()) {
-                  📄 Preparing…
-                } @else {
-                  📄 Download Invoice (PDF)
-                }
+                @if (downloadingInvoice()) { 📄 Preparing… } @else { 📄 Download Invoice (PDF) }
               </button>
-              @if (invoiceError()) {
-                <p class="field-error-msg">{{ invoiceError() }}</p>
-              }
+              @if (invoiceError()) { <p class="field-error-msg">{{ invoiceError() }}</p> }
             </div>
           </div>
         }
@@ -173,12 +197,96 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     #track-modal.active .track-card{transform:translateY(0)}
     .track-card h3{font-family:var(--font-display);font-size:1.4rem;color:var(--color-charcoal);margin-bottom:0.3rem}
     .track-sub{font-size:0.88rem;color:var(--color-body);margin-bottom:1rem}
-    .track-input-group{display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.25rem;align-items:flex-start}
-    .track-input-field{flex:1;min-width:140px;display:flex;flex-direction:column;gap:0.3rem}
-    .track-input-label{font-size:0.78rem;font-weight:600;color:var(--color-charcoal);letter-spacing:0.02em}
-    .track-input-group input{width:100%;padding:0.7rem 1rem;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.9rem;font-family:var(--font-ui);outline:none;transition:var(--transition);box-sizing:border-box}
-    .track-input-group input:focus{border-color:var(--color-primary);box-shadow:0 0 0 3px rgba(136,173,53,0.12)}
-    .btn-track-search{background:var(--color-primary);color:#fff;border:none;padding:0.7rem 1.3rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition);align-self:flex-end;height:42px}
+
+    /* ── Tabs ── */
+    .tabs-row { display: flex; gap: 0; margin-bottom: 1.25rem; align-items: center; }
+    .tab-btn {
+      flex: 1;
+      background: #f4f4f4;
+      border: none;
+      padding: 0.7rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      text-align: center;
+      color: #888;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+      outline: none;
+    }
+    .tab-btn:first-child { border-radius: 12px 0 0 12px; }
+    .tab-btn:last-child { border-radius: 0 12px 12px 0; }
+    .tab-btn.active-tab {
+      background: white;
+      color: var(--color-primary-d);
+      border-bottom-color: var(--color-primary);
+      box-shadow: 0 0 12px rgba(136,173,53,0.5), 0 0 24px rgba(136,173,53,0.25);
+      z-index: 1;
+      position: relative;
+    }
+    .tab-btn.active-tab::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 2px;
+      background: var(--color-primary);
+      border-radius: 2px;
+    }
+    .tab-btn:not(.active-tab):hover {
+      color: var(--color-charcoal);
+      background: #eaeaea;
+    }
+
+    /* Info icon */
+    .info-icon-wrapper {
+      margin-left: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .info-icon {
+      font-size: 1.2rem;
+      color: #aaa;
+      transition: color 0.15s;
+    }
+    .info-icon-wrapper:hover .info-icon {
+      color: var(--color-primary-d);
+    }
+    .info-tooltip {
+      background: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.8rem;
+      color: var(--color-body);
+      line-height: 1.5;
+    }
+
+    /* ── Input fields ── */
+    .track-input-field { flex:1; min-width:140px; display:flex; flex-direction:column; gap:0.3rem; margin-bottom:0.5rem; }
+    .track-input-label { font-size:0.78rem; font-weight:600; color:var(--color-charcoal); letter-spacing:0.02em; }
+    .track-input-field input {
+      width:100%;
+      padding:0.7rem 1rem;
+      border:1.5px solid var(--color-border);
+      border-radius:var(--radius-sm);
+      font-size:0.9rem;
+      font-family:var(--font-ui);
+      outline:none;
+      transition:var(--transition);
+      box-sizing:border-box;
+    }
+    .track-input-field input:focus { border-color:var(--color-primary); box-shadow:0 0 0 3px rgba(136,173,53,0.12); }
+    .btn-track-search{
+      background:var(--color-primary); color:#fff; border:none; padding:0.7rem 1.3rem;
+      border-radius:var(--radius-sm); font-weight:600; font-family:var(--font-ui);
+      cursor:pointer; transition:var(--transition); height:42px; margin-top:0.75rem;
+    }
     .btn-track-search:hover{background:var(--color-primary-d)}
     .error-msg{color:#e05454;font-size:0.85rem;margin-top:0.5rem}
     .field-error-msg{color:#e05454;font-size:0.78rem;margin:0.15rem 0 0}
@@ -232,30 +340,41 @@ import { AppStateService, Order, resolveSiteImageUrl } from '../services/app-sta
     .qr-gallery{display:flex;gap:10px;flex-wrap:wrap}
     .qr-image{width:120px;height:120px;object-fit:contain;border:1px solid var(--color-border);border-radius:8px}
     .oli-badge{padding:0.25rem 0.7rem;border-radius:50px;font-size:0.74rem;font-weight:600;white-space:nowrap}
-
-    /* Invoice download */
     .invoice-row{margin-top:1rem;border-top:1px solid rgba(209,209,209,0.5);padding-top:0.85rem}
     .btn-invoice{width:100%;background:#fff;color:var(--color-charcoal);border:1.5px solid var(--color-border);padding:0.7rem 1rem;border-radius:var(--radius-sm);font-weight:600;font-family:var(--font-ui);cursor:pointer;transition:var(--transition)}
     .btn-invoice:hover:not(:disabled){border-color:var(--color-primary);color:var(--color-primary)}
     .btn-invoice:disabled{opacity:0.6;cursor:not-allowed}
 
-    @media (max-width:600px){.track-card{padding:1.5rem}.track-input-group,.note-row{flex-direction:column}.btn-track-search{align-self:stretch}.track-timeline{flex-wrap:wrap}.track-timeline::before{left:12%;right:12%}}
+    /* Responsive tabs */
+    @media (max-width:600px){
+      .track-card{padding:1.5rem}
+      .tabs-row { flex-wrap: wrap; }
+      .tab-btn { flex-basis: 100%; border-radius: 12px !important; margin-bottom:0.25rem; }
+      .info-icon-wrapper { margin-left: 0; width: 100%; text-align: right; }
+      .track-input-group,.note-row{flex-direction:column}
+      .btn-track-search{align-self:stretch}
+      .track-timeline{flex-wrap:wrap}
+      .track-timeline::before{left:12%;right:12%}
+    }
   `]
 })
 export class TrackOrderModalComponent implements OnInit {
   open = false;
-  /** All orders returned by a phone search — sorted newest first */
   orders = signal<Order[]>([]);
-  /** The single order currently being viewed in detail */
   order = signal<Order | null>(null);
   searchError = signal('');
   paymentQrImages = signal<string[]>([]);
 
-  // Field-level validation
-  phoneError = signal('');
-  orderIdError = signal('');
+  // ── Tab state ──
+  activeTab = signal<'order' | 'phone'>('order');
+  orderIdInput = signal('');
+  phoneInput = signal('');
+  infoOpen = signal(false);
 
-  // Invoice download
+  // Field-level validation errors
+  orderIdError = signal('');
+  phoneError = signal('');
+
   downloadingInvoice = signal(false);
   invoiceError = signal('');
 
@@ -289,94 +408,119 @@ export class TrackOrderModalComponent implements OnInit {
     this.orders.set([]);
     this.order.set(null);
     this.searchError.set('');
+    this.orderIdInput.set('');
+    this.phoneInput.set('');
     this.phoneError.set('');
     this.orderIdError.set('');
     this.invoiceError.set('');
+    this.activeTab.set('order');
+    this.infoOpen.set(false);
   }
 
   searchAgain() { this.reset(); }
 
-  /** Go back to the multi-result list without clearing it */
   backToList() { this.order.set(null); }
 
-  /** User tapped an order card in the multi-result list */
   selectOrder(o: Order) { this.order.set(o); }
 
-  // ── Live field validation ────────────────────────────────────────────
-
-  /** Phone: digits only, exactly 10 — error shown immediately while typing. */
-  onPhoneInput(value: string) {
-    const trimmed = value.trim();
-    if (!trimmed) { this.phoneError.set(''); return; }
-    if (!/^\d*$/.test(trimmed)) {
-      this.phoneError.set('Only digits are allowed.');
-    } else if (trimmed.length !== 10) {
-      this.phoneError.set('Phone number must be exactly 10 digits.');
-    } else {
-      this.phoneError.set('');
-    }
+  // ── Input validation (real‑time) ──────────────────────────────────────
+  onOrderIdInput(value: string) {
+    this.orderIdInput.set(value.trim());
+    this.validateOrderId();
   }
 
-  /** Order ID: must match ORD-YYYY-XXXXXX format — error shown immediately while typing. */
-  onOrderIdInput(value: string) {
-    const trimmed = value.trim();
-    if (!trimmed) { this.orderIdError.set(''); return; }
-    if (!TrackOrderModalComponent.ORDER_ID_REGEX.test(trimmed.toUpperCase())) {
+  onPhoneInput(value: string) {
+    // Allow only digits (while typing)
+    const digits = value.replace(/\D/g, '');
+    this.phoneInput.set(digits);
+    this.validatePhone();
+  }
+
+  private validateOrderId() {
+    const val = this.orderIdInput();
+    if (!val) { this.orderIdError.set(''); return; }
+    if (!TrackOrderModalComponent.ORDER_ID_REGEX.test(val.toUpperCase())) {
       this.orderIdError.set('Order ID should look like ORD-2026-X8B9.');
     } else {
       this.orderIdError.set('');
     }
   }
 
-  lookup(id: string, phone: string) {
+  private validatePhone() {
+    const val = this.phoneInput();
+    if (!val) { this.phoneError.set(''); return; }
+    if (!TrackOrderModalComponent.PHONE_REGEX.test(val)) {
+      this.phoneError.set('Phone number must be exactly 10 digits.');
+    } else {
+      this.phoneError.set('');
+    }
+  }
+
+  // ── Search logic (with fallback) ──────────────────────────────────────
+  lookup() {
     this.searchError.set('');
-    const trimmedId    = id?.trim();
-    const trimmedPhone = phone?.trim();
-
-    // Re-run validation in case the user pasted text or hit Enter without an input event
-    if (trimmedId) this.onOrderIdInput(trimmedId);
-    if (trimmedPhone) this.onPhoneInput(trimmedPhone);
-
-    if (trimmedId) {
+    // Validate the active field
+    if (this.activeTab() === 'order') {
+      this.validateOrderId();
       if (this.orderIdError()) return;
-      // Direct order-ID lookup — always shows single detail view
-      this.orders.set([]);
-      this.fetchOrder(trimmedId.toUpperCase());
-    } else if (trimmedPhone) {
+    } else {
+      this.validatePhone();
       if (this.phoneError()) return;
-      this.state.findOrderByPhone(trimmedPhone).subscribe({
-        next: raw => {
-          if (!raw || raw.length === 0) {
-            this.orders.set([]);
-            this.order.set(null);
-            this.searchError.set('No orders found for that phone number.');
-            return;
-          }
-          // Sort newest first
-          const sorted = [...raw].sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          if (sorted.length === 1) {
-            // Only one order — go straight to detail
-            this.orders.set([]);
-            this.order.set(sorted[0]);
+    }
+
+    const hasId = !!this.orderIdInput() && !this.orderIdError();
+    const hasPhone = !!this.phoneInput() && !this.phoneError();
+
+    if (!hasId && !hasPhone) {
+      this.searchError.set('Please provide a valid Order ID or phone number.');
+      return;
+    }
+
+    if (hasId) {
+      // Try Order ID first, fallback to phone
+      this.orders.set([]);
+      this.state.getOrderByNumber(this.orderIdInput().toUpperCase()).subscribe({
+        next: o => { this.order.set(o); },
+        error: () => {
+          if (hasPhone) {
+            this.searchByPhone(this.phoneInput());
           } else {
-            // Multiple — show the list
-            this.orders.set(sorted);
-            this.order.set(null);
+            this.searchError.set('Order not found. Check the ID and try again.');
           }
-        },
-        error: () => this.searchError.set('Could not search orders.')
+        }
       });
     } else {
-      this.searchError.set('Enter an Order ID or phone number.');
+      // Phone only
+      this.searchByPhone(this.phoneInput());
     }
+  }
+
+  private searchByPhone(phone: string) {
+    this.state.findOrderByPhone(phone).subscribe({
+      next: raw => {
+        if (!raw || raw.length === 0) {
+          this.searchError.set('No orders found for that phone number.');
+          return;
+        }
+        const sorted = [...raw].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        if (sorted.length === 1) {
+          this.orders.set([]);
+          this.order.set(sorted[0]);
+        } else {
+          this.orders.set(sorted);
+          this.order.set(null);
+        }
+      },
+      error: () => this.searchError.set('Could not search orders. Please try again.')
+    });
   }
 
   fetchOrder(orderNumber: string) {
     this.searchError.set('');
     this.state.getOrderByNumber(orderNumber).subscribe({
-      next: o  => this.order.set(o),
+      next: o => this.order.set(o),
       error: () => this.searchError.set('Order not found.')
     });
   }
@@ -386,11 +530,9 @@ export class TrackOrderModalComponent implements OnInit {
     if (!ord || !text.trim()) return;
     this.state.addOrderMessageByNumber(ord.publicOrderNumber, text.trim()).subscribe({
       next: msg => this.order.update(o => o ? { ...o, messages: [...o.messages, msg] } : o),
-      error: ()  => this.searchError.set('Could not send message.')
+      error: () => this.searchError.set('Could not send message.')
     });
   }
-
-  // ── Invoice download ────────────────────────────────────────────────
 
   downloadInvoice(ord: Order) {
     if (this.downloadingInvoice()) return;
@@ -413,8 +555,7 @@ export class TrackOrderModalComponent implements OnInit {
     });
   }
 
-  // ── Status helpers ──────────────────────────────────────────────────
-
+  // ── Status helpers ──────────────────────────────────────────────────────
   statusLabel(o: Order): string {
     if (o.paymentStatus === 'Failed') return 'Payment Failed';
     if (o.status === 'Cancelled')     return 'Cancelled';
@@ -437,11 +578,9 @@ export class TrackOrderModalComponent implements OnInit {
   isPaymentVerified(o: Order): boolean {
     return ['PaymentVerified','Packed','Dispatched','Delivered'].includes(o.status);
   }
-
   isPacked(o: Order): boolean {
     return ['Packed','Dispatched','Delivered'].includes(o.status);
   }
-
   isDispatched(o: Order): boolean {
     return ['Dispatched','Delivered'].includes(o.status);
   }
