@@ -71,7 +71,7 @@ builder.Services.AddCors(options =>
             .WithOrigins(
                 "http://localhost:4200",
                 "https://localhost:4200",
-                "https://giftshop.vercel.app") // replace with real prod URL
+                "https://kalakaari-gifting.onrender.com") // replace with real prod URL
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
