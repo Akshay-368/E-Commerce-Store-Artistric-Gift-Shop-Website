@@ -3020,7 +3020,7 @@
       "Microsoft.EntityFrameworkCore >= 10.0.5",
       "Microsoft.EntityFrameworkCore.Design >= 10.0.5",
       "Npgsql.EntityFrameworkCore.PostgreSQL >= 10.0.0-preview.7",
-      "QUestPDF >= 2026.6.0"
+      "QuestPDF >= 2026.6.0"
     ]
   },
   "packageFolders": {
@@ -3029,11 +3029,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+      "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
       "projectName": "GiftShop.Infrastructure",
-      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
       "packagesPath": "C:\\Users\\aksha\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\obj\\",
+      "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\aksha\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -3048,11 +3048,11 @@
         "net10.0": {
           "targetAlias": "net10.0",
           "projectReferences": {
-            "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj": {
-              "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj"
+            "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj": {
+              "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj"
             },
-            "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj": {
-              "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj"
+            "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj": {
+              "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj"
             }
           }
         }
@@ -3095,7 +3095,7 @@
             "target": "Package",
             "version": "[10.0.0-preview.7, )"
           },
-          "QUestPDF": {
+          "QuestPDF": {
             "target": "Package",
             "version": "[2026.6.0, )"
           }

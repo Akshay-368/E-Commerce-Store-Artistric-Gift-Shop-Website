@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
+      "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
       "projectName": "GiftShop.Domain",
-      "projectPath": "c:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
+      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
       "packagesPath": "C:\\Users\\aksha\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\obj\\",
+      "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\aksha\\AppData\\Roaming\\NuGet\\NuGet.Config"

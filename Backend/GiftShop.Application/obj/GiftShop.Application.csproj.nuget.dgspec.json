@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj": {}
+    "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj": {}
   },
   "projects": {
-    "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj": {
+    "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj",
+        "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj",
         "projectName": "GiftShop.Application",
-        "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj",
+        "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj",
         "packagesPath": "C:\\Users\\aksha\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\obj\\",
+        "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\aksha\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -26,8 +26,8 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj": {
-                "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj"
+              "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj": {
+                "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj"
               }
             }
           }
@@ -347,14 +347,14 @@
         }
       }
     },
-    "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj": {
+    "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
+        "projectUniqueName": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
         "projectName": "GiftShop.Domain",
-        "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
+        "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\GiftShop.Domain.csproj",
         "packagesPath": "C:\\Users\\aksha\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Domain\\obj\\",
+        "outputPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\aksha\\AppData\\Roaming\\NuGet\\NuGet.Config"

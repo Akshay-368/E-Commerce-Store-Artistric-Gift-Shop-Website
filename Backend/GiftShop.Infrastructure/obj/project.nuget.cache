@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "dbiLaMitjkg=",
+  "dgSpecHash": "VRvhmegx7HE=",
   "success": true,
-  "projectFilePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+  "projectFilePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\aksha\\.nuget\\packages\\cloudinarydotnet\\1.26.2\\cloudinarydotnet.1.26.2.nupkg.sha512",
     "C:\\Users\\aksha\\.nuget\\packages\\dotnetenv\\3.1.1\\dotnetenv.3.1.1.nupkg.sha512",
@@ -52,9 +52,9 @@
       "code": "NU1608",
       "level": "Warning",
       "message": "Detected package version outside of dependency constraint: Npgsql.EntityFrameworkCore.PostgreSQL 10.0.0-preview.7 requires Microsoft.EntityFrameworkCore (= 10.0.0-preview.7.25380.108) but version Microsoft.EntityFrameworkCore 10.0.5 was resolved.",
-      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
       "warningLevel": 1,
-      "filePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+      "filePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
       "libraryId": "Microsoft.EntityFrameworkCore",
       "targetGraphs": [
         "net10.0"
@@ -64,9 +64,9 @@
       "code": "NU1608",
       "level": "Warning",
       "message": "Detected package version outside of dependency constraint: Npgsql.EntityFrameworkCore.PostgreSQL 10.0.0-preview.7 requires Microsoft.EntityFrameworkCore.Relational (= 10.0.0-preview.7.25380.108) but version Microsoft.EntityFrameworkCore.Relational 10.0.5 was resolved.",
-      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+      "projectPath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
       "warningLevel": 1,
-      "filePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
+      "filePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Infrastructure\\GiftShop.Infrastructure.csproj",
       "libraryId": "Microsoft.EntityFrameworkCore.Relational",
       "targetGraphs": [
         "net10.0"

@@ -10,6 +10,12 @@ import { join } from 'node:path';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
+// Trust Render's reverse proxy (Cloudflare + Render load balancer).
+// Required so Angular SSR correctly reads X-Forwarded-For and X-Forwarded-Host
+// headers instead of seeing internal Render network IPs.
+app.set('trust proxy', 1);
+ 
+const angularApp = new AngularNodeAppEngine();
 const angularApp = new AngularNodeAppEngine();
 
 /**

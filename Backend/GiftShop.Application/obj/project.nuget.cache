@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "eBApLi9pIXQ=",
+  "dgSpecHash": "WkeahzN26C4=",
   "success": true,
-  "projectFilePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Gift-Shop\\Backend\\GiftShop.Application\\GiftShop.Application.csproj",
+  "projectFilePath": "C:\\Users\\aksha\\E-Commerce Store\\E-Commerce-Store-Artistric-Gift-Shop-Website\\Backend\\GiftShop.Application\\GiftShop.Application.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\aksha\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.5\\microsoft.entityframeworkcore.10.0.5.nupkg.sha512",
     "C:\\Users\\aksha\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.5\\microsoft.entityframeworkcore.abstractions.10.0.5.nupkg.sha512",
