@@ -186,6 +186,34 @@ app.MapPost("/api/monitoring/ping", async (TelemetryPing ping, HttpContext conte
 
 app.MapControllers();
 
+/*
+Everything being seeded and what happens if deleted
+1. Categories (6 items)
+Guard: if (!await context.Categories.AnyAsync(c => c.Slug == slug))
+Behaviour if deleted: ✅ Will NOT come back. The check is per-slug. If you delete a category (e.g. "Accessories" with slug accessories), on next startup it checks AnyAsync(c => c.Slug == "accessories") — since it's gone, it will be re-seeded.
+So yes, categories will return if deleted.
+
+2. Mock Products (8 items)
+Guard: if (await context.Products.AnyAsync(p => p.Slug == mp.Slug)) continue;
+Behaviour if deleted: Same problem. If you delete the "Minimalist Leather Wallet" product (slug: minimalist-leather-wallet), on next cold start it checks for that slug, finds nothing, and re-seeds it along with its Unsplash image.
+So yes, mock products will return if deleted.
+
+3. Site Content — Text & Images (hero, manifesto, feature sections)
+Guard: if (!await context.SiteContentItems.AnyAsync(i => i.ContentKey == key))
+Behaviour if deleted: Same. Delete the hero heading text from the admin panel? Next startup re-seeds it. Delete the default Unsplash hero slideshow images? They come back.
+But note: If the admin edits text (not deletes the row), it won't reseed because the key still exists. The problem is only on row deletion.
+
+4. Admin User
+Guard: if (!await context.AdminUsers.AnyAsync())
+Behaviour if deleted: If ALL admin users are deleted, a default one is re-created from env vars. This is actually intentional and good — don't touch this one.
+
+5. IsTotpEnabled AdminSetting
+Guard: if (!await context.AdminSettings.AnyAsync(s => s.Key == "IsTotpEnabled"))
+Behaviour if deleted: Re-seeded to true. But you'd never delete this from the admin panel so it's fine.
+
+The fix — make all seeding truly one-time
+The solution is a seed-lock table — a simple DB flag that records whether the initial seed has already run. If the flag exists, skip all seeding entirely. This means: run once on first deploy, never again regardless of what the admin deletes.
+*/
 // ── Database migration + seeding on startup ──────────────────────────────
 // All seeding is idempotent ( checks before inserting)so it is safe to re-run on every startup-nothing is duplicated. 
 using (var scope = app.Services.CreateScope())
@@ -220,224 +248,253 @@ using (var scope = app.Services.CreateScope())
         ");
         logger.LogInformation("[Startup] Defensive schema guard applied.");
 
-        // Seed default categories (matching the mock products in the frontend)
-        // These are seeded once so the admin can immediately assign categories when
-        // creating a product . the frontend mock data uses thee same category names.
-        var defaultCategories = new[]
-        {
-            ("Accessories",  "accessories",  "Bags, wallets, keychains, and wearable accessories"),
-            ("Home Decor",   "home-decor",   "Vases, candles, frames, and decorative items for the home"),
-            ("Kitchen",      "kitchen",      "Mugs, cups, and kitchen accessories"),
-            ("Stationery",   "stationery",   "Notebooks, journals, pens, and desk accessories"),
-            ("Jewellery",    "jewellery",    "Handcrafted rings, pendants, earrings, and necklaces"),
-            ("Gifting",      "gifting",      "Curated gift sets, hampers, and ready-to-gift items"),
-        };
+        // ── SEED LOCK — only seed once, ever ────────────────────────────
+        // Check for a special AdminSetting that acts as a one-time seed flag.
+        // Once set, all seed blocks below are permanently skipped- even if the 
+        // admin delets products, categories, or site content from the panel.
+        const string SeedLockKey = "InitialSeedCompleteled";
+        bool alreadySeeded = await context.AdminSettings.AnyAsync(s => s.Key == SeedLockKey);
 
-        foreach (var (name, slug, desc) in defaultCategories)
+        if (!alreadySeeded)
         {
-            if (!await context.Categories.AnyAsync(c => c.Slug == slug))
-            {
-                context.Categories.Add(new GiftShop.Domain.Entities.Category
-                {
-                    Name = name,
-                    Slug = slug,
-                    Description = desc,
-                    IsActive = true
-                });
-            }
-        }
-        await context.SaveChangesAsync();
-        logger.LogInformation("[Startup] Default categories seeded.");
+            logger.LogInformation("[Startup] First-time seed starting ...");
 
-        // Fetch all categories into a lookup for product seeding below
-        var catLookup = await context.Categories.ToDictionaryAsync(c => c.Slug , c => c.Id );
-        
-        // ── 2. MOCK PRODUCTS (the 8 from app-state.service.ts) ──────────
-        // Seeded exactly once per product slug. The admin can toggle IsActive,
-        // edit, or delete these just like any other product. The Unsplash
-        // image URLs are stored directly as ImageUrl (no Cloudinary PublicId).
-        var mockProducts = new[]
-        {
-            new
-            {
-                Slug = "minimalist-leather-wallet",
-                Title = "Minimalist Leather Wallet",
-                ShortDescription = "Slim, full-grain leather bifold wallet",
-                Description = "A hand-stitched bifold leather wallet crafted from full-grain vegetable-tanned leather. Ages beautifully with everyday use and holds up to 8 cards plus cash.",
-                Price = 2499m,
-                CategorySlug = "accessories",
-                SortOrder = 1,
-                ImageUrl = "https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "handwoven-keychain",
-                Title = "Handwoven Keychain",
-                ShortDescription = "Premium cotton-thread macramé keychain",
-                Description = "A beautifully handwoven keychain made from premium cotton threads in earthy tones. Each piece is unique — no two are exactly the same. Perfect for gifting.",
-                Price = 499m,
-                CategorySlug = "accessories",
-                SortOrder = 2,
-                ImageUrl = "https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "ceramic-mug-slate",
-                Title = "Ceramic Mug — Slate",
-                ShortDescription = "Handthrown mug with reactive slate-grey glaze",
-                Description = "Thrown by hand on a potter's wheel and fired at high temperature with a reactive slate-grey glaze that produces unique speckle patterns on every cup. Holds 350ml.",
-                Price = 799m,
-                CategorySlug = "kitchen",
-                SortOrder = 3,
-                ImageUrl = "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "wooden-photo-frame",
-                Title = "Wooden Photo Frame",
-                ShortDescription = "Reclaimed teakwood frame, 4×6 inch",
-                Description = "Handcrafted solid-wood photo frame made from reclaimed teakwood. Each frame has unique wood-grain character. Fits standard 4×6 inch photographs. Includes easel back.",
-                Price = 1199m,
-                CategorySlug = "home-decor",
-                SortOrder = 4,
-                ImageUrl = "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "handmade-notebook",
-                Title = "Handmade Notebook",
-                ShortDescription = "Hand-bound journal, 160 pages, linen cover",
-                Description = "A hand-bound journal with a textured linen cover in sage green. Filled with 160 pages of acid-free ivory paper. Includes a ribbon bookmark and elastic closure.",
-                Price = 599m,
-                CategorySlug = "stationery",
-                SortOrder = 5,
-                ImageUrl = "https://images.unsplash.com/photo-1531346878377-a5be20888e57?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "minimal-pendant",
-                Title = "Minimal Pendant",
-                ShortDescription = "Recycled sterling silver teardrop pendant",
-                Description = "An elegantly minimal pendant hand-formed from recycled sterling silver. The subtle hammered texture catches light beautifully. Comes on an 18-inch silver chain.",
-                Price = 1199m,
-                CategorySlug = "jewellery",
-                SortOrder = 6,
-                ImageUrl = "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "soy-wax-candle-set",
-                Title = "Soy Wax Candle Set",
-                ShortDescription = "Set of 3 hand-poured soy candles",
-                Description = "A set of three hand-poured soy wax candles with wooden wicks that crackle gently as they burn. Scents: Sandalwood & Amber, Jasmine & Vetiver, and Cedarwood & Vanilla.",
-                Price = 1450m,
-                CategorySlug = "home-decor",
-                SortOrder = 7,
-                ImageUrl = "https://images.unsplash.com/photo-1603006905003-be475563bc59?q=80&w=1000&auto=format&fit=crop"
-            },
-            new
-            {
-                Slug = "glass-vase-botanical",
-                Title = "Glass Vase — Botanical",
-                ShortDescription = "Hand-blown glass vase, botanical green",
-                Description = "A striking hand-blown glass vase with subtle botanical-green tones that shift with the light. Each piece is entirely unique. Height 22cm, opening 6cm. Perfect for dried florals.",
-                Price = 1850m,
-                CategorySlug = "home-decor",
-                SortOrder = 8,
-                ImageUrl = "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?q=80&w=1000&auto=format&fit=crop"
-            },
-        };
 
-        foreach (var mp in mockProducts)
-        {
-            if (await context.Products.AnyAsync(p => p.Slug == mp.Slug)) continue; // skip if already seeded
-
-            catLookup.TryGetValue(mp.CategorySlug, out var catId);
-            var product = new Product
+            // Seed default categories (matching the mock products in the frontend)
+            // These are seeded once so the admin can immediately assign categories when
+            // creating a product . the frontend mock data uses thee same category names.
+            var defaultCategories = new[]
             {
-                Title = mp.Title, Slug = mp.Slug,
-                ShortDescription = mp.ShortDescription,
-                Description = mp.Description,
-                Price = mp.Price,
-                CategoryId = catId == Guid.Empty ? null : catId,
-                SortOrder = mp.SortOrder,
-                IsActive = true
+                ("Accessories",  "accessories",  "Bags, wallets, keychains, and wearable accessories"),
+                ("Home Decor",   "home-decor",   "Vases, candles, frames, and decorative items for the home"),
+                ("Kitchen",      "kitchen",      "Mugs, cups, and kitchen accessories"),
+                ("Stationery",   "stationery",   "Notebooks, journals, pens, and desk accessories"),
+                ("Jewellery",    "jewellery",    "Handcrafted rings, pendants, earrings, and necklaces"),
+                ("Gifting",      "gifting",      "Curated gift sets, hampers, and ready-to-gift items"),
             };
-            context.Products.Add(product);
-            await context.SaveChangesAsync(); // save to get the generated Id
 
-            // Add primary image using the Unsplash URL directly
-            context.ProductImages.Add(new ProductImage
+            foreach (var (name, slug, desc) in defaultCategories)
             {
-                ProductId = product.Id,
-                ImageUrl = mp.ImageUrl,
-                PublicId = null, // no Cloudinary public_id for seeded images
-                AltText = mp.Title,
-                IsPrimary = true,
-                SortOrder = 0
+                if (!await context.Categories.AnyAsync(c => c.Slug == slug))
+                {
+                    context.Categories.Add(new GiftShop.Domain.Entities.Category
+                    {
+                        Name = name,
+                        Slug = slug,
+                        Description = desc,
+                        IsActive = true
+                    });
+                }
+            }
+            await context.SaveChangesAsync();
+            logger.LogInformation("[Startup] Default categories seeded.");
+
+            // Fetch all categories into a lookup for product seeding below
+            var catLookup = await context.Categories.ToDictionaryAsync(c => c.Slug , c => c.Id );
+            
+            // ── 2. MOCK PRODUCTS (the 8 from app-state.service.ts) ──────────
+            // Seeded exactly once per product slug. The admin can toggle IsActive,
+            // edit, or delete these just like any other product. The Unsplash
+            // image URLs are stored directly as ImageUrl (no Cloudinary PublicId).
+            var mockProducts = new[]
+            {
+                new
+                {
+                    Slug = "minimalist-leather-wallet",
+                    Title = "Minimalist Leather Wallet",
+                    ShortDescription = "Slim, full-grain leather bifold wallet",
+                    Description = "A hand-stitched bifold leather wallet crafted from full-grain vegetable-tanned leather. Ages beautifully with everyday use and holds up to 8 cards plus cash.",
+                    Price = 2499m,
+                    CategorySlug = "accessories",
+                    SortOrder = 1,
+                    ImageUrl = "https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "handwoven-keychain",
+                    Title = "Handwoven Keychain",
+                    ShortDescription = "Premium cotton-thread macramé keychain",
+                    Description = "A beautifully handwoven keychain made from premium cotton threads in earthy tones. Each piece is unique — no two are exactly the same. Perfect for gifting.",
+                    Price = 499m,
+                    CategorySlug = "accessories",
+                    SortOrder = 2,
+                    ImageUrl = "https://images.unsplash.com/photo-1578662996442-48f60103fc96?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "ceramic-mug-slate",
+                    Title = "Ceramic Mug — Slate",
+                    ShortDescription = "Handthrown mug with reactive slate-grey glaze",
+                    Description = "Thrown by hand on a potter's wheel and fired at high temperature with a reactive slate-grey glaze that produces unique speckle patterns on every cup. Holds 350ml.",
+                    Price = 799m,
+                    CategorySlug = "kitchen",
+                    SortOrder = 3,
+                    ImageUrl = "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "wooden-photo-frame",
+                    Title = "Wooden Photo Frame",
+                    ShortDescription = "Reclaimed teakwood frame, 4×6 inch",
+                    Description = "Handcrafted solid-wood photo frame made from reclaimed teakwood. Each frame has unique wood-grain character. Fits standard 4×6 inch photographs. Includes easel back.",
+                    Price = 1199m,
+                    CategorySlug = "home-decor",
+                    SortOrder = 4,
+                    ImageUrl = "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "handmade-notebook",
+                    Title = "Handmade Notebook",
+                    ShortDescription = "Hand-bound journal, 160 pages, linen cover",
+                    Description = "A hand-bound journal with a textured linen cover in sage green. Filled with 160 pages of acid-free ivory paper. Includes a ribbon bookmark and elastic closure.",
+                    Price = 599m,
+                    CategorySlug = "stationery",
+                    SortOrder = 5,
+                    ImageUrl = "https://images.unsplash.com/photo-1531346878377-a5be20888e57?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "minimal-pendant",
+                    Title = "Minimal Pendant",
+                    ShortDescription = "Recycled sterling silver teardrop pendant",
+                    Description = "An elegantly minimal pendant hand-formed from recycled sterling silver. The subtle hammered texture catches light beautifully. Comes on an 18-inch silver chain.",
+                    Price = 1199m,
+                    CategorySlug = "jewellery",
+                    SortOrder = 6,
+                    ImageUrl = "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "soy-wax-candle-set",
+                    Title = "Soy Wax Candle Set",
+                    ShortDescription = "Set of 3 hand-poured soy candles",
+                    Description = "A set of three hand-poured soy wax candles with wooden wicks that crackle gently as they burn. Scents: Sandalwood & Amber, Jasmine & Vetiver, and Cedarwood & Vanilla.",
+                    Price = 1450m,
+                    CategorySlug = "home-decor",
+                    SortOrder = 7,
+                    ImageUrl = "https://images.unsplash.com/photo-1603006905003-be475563bc59?q=80&w=1000&auto=format&fit=crop"
+                },
+                new
+                {
+                    Slug = "glass-vase-botanical",
+                    Title = "Glass Vase — Botanical",
+                    ShortDescription = "Hand-blown glass vase, botanical green",
+                    Description = "A striking hand-blown glass vase with subtle botanical-green tones that shift with the light. Each piece is entirely unique. Height 22cm, opening 6cm. Perfect for dried florals.",
+                    Price = 1850m,
+                    CategorySlug = "home-decor",
+                    SortOrder = 8,
+                    ImageUrl = "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?q=80&w=1000&auto=format&fit=crop"
+                },
+            };
+
+            foreach (var mp in mockProducts)
+            {
+                if (await context.Products.AnyAsync(p => p.Slug == mp.Slug)) continue; // skip if already seeded
+
+                catLookup.TryGetValue(mp.CategorySlug, out var catId);
+                var product = new Product
+                {
+                    Title = mp.Title, Slug = mp.Slug,
+                    ShortDescription = mp.ShortDescription,
+                    Description = mp.Description,
+                    Price = mp.Price,
+                    CategoryId = catId == Guid.Empty ? null : catId,
+                    SortOrder = mp.SortOrder,
+                    IsActive = true
+                };
+                context.Products.Add(product);
+                await context.SaveChangesAsync(); // save to get the generated Id
+
+                // Add primary image using the Unsplash URL directly
+                context.ProductImages.Add(new ProductImage
+                {
+                    ProductId = product.Id,
+                    ImageUrl = mp.ImageUrl,
+                    PublicId = null, // no Cloudinary public_id for seeded images
+                    AltText = mp.Title,
+                    IsPrimary = true,
+                    SortOrder = 0
+                });
+                await context.SaveChangesAsync();
+            }
+            logger.LogInformation("[Startup] Mock products seeded.");
+
+            // ── 3. SITE CONTENT (text + default section images) ──────────────
+            // Text content: seeded once. Admin edits these via the Homepage panel.
+            // Image content: seeded with ExternalImageUrl pointing to Unsplash defaults.
+            // Admin can later upload real images which override via BinaryValue.
+            var contentSeeds = new List<(string key, string section, SiteContentItemKind kind, string? text, string? extUrl, int sort)>
+            {
+                // ── Hero text ──
+                ("hero.heading",    "hero", SiteContentItemKind.Text, "Welcome to", null, 0),
+                ("hero.subheading", "hero", SiteContentItemKind.Text, "Kalakaari Gifting", null, 1),
+                ("hero.copy",       "hero", SiteContentItemKind.Text,
+                    "Discover the Charm of Handmade Art at Your Doorstep — thoughtfully crafted, beautifully wrapped, and designed to turn ordinary days into unforgettable celebrations.", null, 2),
+
+                // ── Hero images (slideshow) ──
+                ("hero.image.0", "hero", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop", 0),
+                ("hero.image.1", "hero", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1607344645866-009c320b63e0?q=80&w=2000&auto=format&fit=crop", 1),
+                ("hero.image.2", "hero", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=2000&auto=format&fit=crop", 2),
+
+                // ── Manifesto text ──
+                ("manifesto.quote", "manifesto", SiteContentItemKind.Text,
+                    "We believe that a gift shouldn't just be an object; it should be a tangible reflection of a connection. Every artistic piece in our boutique is hand-selected and crafted in limited numbers, ensuring that whatever you choose to share is as unique and wonderful as the person receiving it.", null, 0),
+
+                // ── Feature-1 text + images ──
+                ("feature-1.para1", "feature-1", SiteContentItemKind.Text,
+                    "Unlike mass-produced store items, our fancy gift collections are born from local studio sessions. From initial sketch to final polish, each item carries distinct artistic character and absolute material perfection.", null, 0),
+                ("feature-1.image.0", "feature-1", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop", 0),
+                ("feature-1.image.1", "feature-1", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=1000&auto=format&fit=crop", 1),
+
+                // ── Feature-2 text + images ──
+                ("feature-2.para1", "feature-2", SiteContentItemKind.Text,
+                    "Presentation is half the magic of a thoughtful surprise. Every order is meticulously packaged in our signature keepsake boxing with a blank or custom-written message card, ready to delight them the exact second it arrives.", null, 0),
+                ("feature-2.image.0", "feature-2", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop", 0),
+                ("feature-2.image.1", "feature-2", SiteContentItemKind.Image, null,
+                    "https://images.unsplash.com/photo-1607344645866-009c320b63e0?q=80&w=1000&auto=format&fit=crop", 1),
+            };
+
+            foreach (var (key, section, kind, text, extUrl, sort) in contentSeeds)
+            {
+                if (!await context.SiteContentItems.AnyAsync(i => i.ContentKey == key))
+                {
+                    context.SiteContentItems.Add(new SiteContentItem
+                    {
+                        ContentKey = key, SectionName = section, Kind = kind,
+                        TextValue = text, ExternalImageUrl = extUrl,
+                        AltText = kind == SiteContentItemKind.Image ? section + " image" : null,
+                        SortOrder = sort, IsActive = true
+                    });
+                }
+            }
+            await context.SaveChangesAsync();
+            logger.LogInformation("[Startup] Site content seeded.");
+
+            // ── Write the seed lock LAST, only after everything succeeded ─
+            context.AdminSettings.Add(new AdminSetting
+            {
+                Key = SeedLockKey,
+                Value = DateTimeOffset.UtcNow.ToString("o") // ISO timestamp of when seeding ran
             });
             await context.SaveChangesAsync();
+            logger.LogInformation("[Startup] Initial seed complete. Seed lock written.");
         }
-        logger.LogInformation("[Startup] Mock products seeded.");
-
-        // ── 3. SITE CONTENT (text + default section images) ──────────────
-        // Text content: seeded once. Admin edits these via the Homepage panel.
-        // Image content: seeded with ExternalImageUrl pointing to Unsplash defaults.
-        // Admin can later upload real images which override via BinaryValue.
-        var contentSeeds = new List<(string key, string section, SiteContentItemKind kind, string? text, string? extUrl, int sort)>
+        else
         {
-            // ── Hero text ──
-            ("hero.heading",    "hero", SiteContentItemKind.Text, "Welcome to", null, 0),
-            ("hero.subheading", "hero", SiteContentItemKind.Text, "Kalakaari Gifting", null, 1),
-            ("hero.copy",       "hero", SiteContentItemKind.Text,
-                "Discover the Charm of Handmade Art at Your Doorstep — thoughtfully crafted, beautifully wrapped, and designed to turn ordinary days into unforgettable celebrations.", null, 2),
-
-            // ── Hero images (slideshow) ──
-            ("hero.image.0", "hero", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=2000&auto=format&fit=crop", 0),
-            ("hero.image.1", "hero", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1607344645866-009c320b63e0?q=80&w=2000&auto=format&fit=crop", 1),
-            ("hero.image.2", "hero", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=2000&auto=format&fit=crop", 2),
-
-            // ── Manifesto text ──
-            ("manifesto.quote", "manifesto", SiteContentItemKind.Text,
-                "We believe that a gift shouldn't just be an object; it should be a tangible reflection of a connection. Every artistic piece in our boutique is hand-selected and crafted in limited numbers, ensuring that whatever you choose to share is as unique and wonderful as the person receiving it.", null, 0),
-
-            // ── Feature-1 text + images ──
-            ("feature-1.para1", "feature-1", SiteContentItemKind.Text,
-                "Unlike mass-produced store items, our fancy gift collections are born from local studio sessions. From initial sketch to final polish, each item carries distinct artistic character and absolute material perfection.", null, 0),
-            ("feature-1.image.0", "feature-1", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop", 0),
-            ("feature-1.image.1", "feature-1", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=1000&auto=format&fit=crop", 1),
-
-            // ── Feature-2 text + images ──
-            ("feature-2.para1", "feature-2", SiteContentItemKind.Text,
-                "Presentation is half the magic of a thoughtful surprise. Every order is meticulously packaged in our signature keepsake boxing with a blank or custom-written message card, ready to delight them the exact second it arrives.", null, 0),
-            ("feature-2.image.0", "feature-2", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop", 0),
-            ("feature-2.image.1", "feature-2", SiteContentItemKind.Image, null,
-                "https://images.unsplash.com/photo-1607344645866-009c320b63e0?q=80&w=1000&auto=format&fit=crop", 1),
-        };
-
-        foreach (var (key, section, kind, text, extUrl, sort) in contentSeeds)
-        {
-            if (!await context.SiteContentItems.AnyAsync(i => i.ContentKey == key))
-            {
-                context.SiteContentItems.Add(new SiteContentItem
-                {
-                    ContentKey = key, SectionName = section, Kind = kind,
-                    TextValue = text, ExternalImageUrl = extUrl,
-                    AltText = kind == SiteContentItemKind.Image ? section + " image" : null,
-                    SortOrder = sort, IsActive = true
-                });
-            }
+            logger.LogInformation("[Startup] Seed Lock found - skipping initial seed .");
         }
-        await context.SaveChangesAsync();
-        logger.LogInformation("[Startup] Site content seeded.");
 
 
+        // ── Admin user + IsTotpEnabled stay OUTSIDE the seed lock ────────
+        // These are self-healing — if someone accidentally deletes the only admin
+        // account or the TOTP setting, they should come back. They're not content.
         // Seed admin user if none exists
         if (!await context.AdminUsers.AnyAsync())
         {

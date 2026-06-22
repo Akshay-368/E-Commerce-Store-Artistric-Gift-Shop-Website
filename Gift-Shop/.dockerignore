@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Frontend .dockerignore
+# Place this file at:  Gift-Shop/.dockerignore
+#
+# Excludes files that should not be sent to the Docker build context.
+# The most important exclusion is node_modules — it's huge and must be
+# rebuilt inside the container for the correct architecture (linux/amd64).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Never copy node_modules — npm ci inside the container builds these fresh
+node_modules/
+
+# Angular build output — rebuilt inside the container by `npm run build`
+dist/
+
+# .env files — never bake secrets into images
+.env
+.env.*
+*.env
+
+# Git history
+.git/
+.gitignore
+.github/
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Test coverage output
+coverage/
+
+# README
+README.md
