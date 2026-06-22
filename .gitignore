@@ -89,3 +89,95 @@ obj/
 *.cache 
 *.dll 
 *.exe 
+
+# Angular specific
+/dist/
+/out-tsc/
+/tmp/
+/coverage/
+/e2e/test-output/
+/.angular/
+.angular/
+
+# Node modules and dependency files
+/node_modules/
+/package-lock.json
+/yarn.lock
+
+# Environment files
+/.env
+
+# Angular CLI and build artefacts
+/.angular-cli.json
+/.ng/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+# .NET build artifacts
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.log
+*.user
+*.vspscc
+*.suo
+
+# Visual Studio files
+.vs/
+*.dbmdl
+*.bak
+*.mdf
+*.ldf
+
+# ASP.NET scaffolding
+App_Data/
+App_Start/
+Generated_Code/
+
+# NuGet packages
+*.nupkg
+packages/
+*.snupkg
+
+# Publish output
+publish/
+*.Publish.xml
+
+# Rider / JetBrains IDE
+.idea/
+
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# Dotnet tools
+*.dotCover
+*.dotSettings
+*.dotSettings.user
+
+# Others
+*.swp
+*.tmp
+*.env 
+node_modules/ 
+dist/ 
+build/ 
+bin/ 
+obj/ 
+*.log 
+*.tmp 
+*.cache 
+*.dll 
+*.exe 
