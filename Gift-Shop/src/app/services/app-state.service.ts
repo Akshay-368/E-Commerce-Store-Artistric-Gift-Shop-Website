@@ -5,7 +5,7 @@ import { BehaviorSubject, Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 
 // ── Environment / API base ─────────────────────────────────────────────────
-const API_BASE = 'http://localhost:5000';
+const API_BASE = 'https://e-commerce-store-artistric-gift-shop.onrender.com';
 
 // ── DTOs ───────────────────────────────────────────────────────────────────
 export interface ProductImage {

@@ -455,7 +455,7 @@ const SECTIONS: SectionDef[] = [
 })
 export class AdminHomepageComponent implements OnInit {
   readonly sections = SECTIONS;
-  readonly API_BASE = 'http://localhost:5000';
+  readonly API_BASE = 'https://e-commerce-store-artistric-gift-shop.onrender.com';
 
   activeSection = signal('hero');
   loading = signal(false);

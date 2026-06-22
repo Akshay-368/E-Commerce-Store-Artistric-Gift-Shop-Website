@@ -60,7 +60,7 @@ ENV NODE_ENV=production
 # This is read by the Angular SSR server when it makes server-side HTTP calls.
 # Set this in Render's environment variables dashboard:
 #   BACKEND_URL = https://your-backend-service.onrender.com
-ENV BACKEND_URL=http://localhost:5000
+ENV BACKEND_URL=https://e-commerce-store-artistric-gift-shop.onrender.com
 
 # Expose the port (documentation only — Render uses PORT env var)
 EXPOSE 4000

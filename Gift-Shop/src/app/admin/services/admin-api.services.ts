@@ -4,7 +4,7 @@ import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { AdminAuthService } from './admin-auth.service';
 
-const API = 'http://localhost:5000';
+const API = 'https://e-commerce-store-artistric-gift-shop.onrender.com';
 
 export interface AdminCategory {
   id: string;

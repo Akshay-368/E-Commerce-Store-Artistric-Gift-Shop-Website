@@ -4,7 +4,7 @@ import { Injectable } from '@angular/core';
 export class TelemetryService {
   trackUserAction(action: string, metadata: string): void {
     const payload = JSON.stringify({ action, metadata });
-    const url = 'http://localhost:5000/api/monitoring/ping'; // or relative when using proxy
+    const url = 'https://e-commerce-store-artistric-gift-shop.onrender.com/api/monitoring/ping'; // or relative when using proxy
 
     // Use native fetch with keepalive
     if (typeof fetch !== 'undefined') {

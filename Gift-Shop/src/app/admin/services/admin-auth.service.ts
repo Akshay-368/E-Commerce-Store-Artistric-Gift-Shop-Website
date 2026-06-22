@@ -4,7 +4,7 @@ import { inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 
-const API = 'http://localhost:5000';
+const API = 'https://e-commerce-store-artistric-gift-shop.onrender.com';
 
 // Storage keys
 const LOCK_KEY      = '__adm_lock';       // pre-auth cooldown expiry (ms)
