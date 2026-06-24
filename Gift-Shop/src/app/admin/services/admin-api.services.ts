@@ -26,6 +26,7 @@ export interface AdminProduct {
   isActive: boolean;
   sortOrder: number;
   images: AdminProductImage[];
+  videoUrl?: string;
 }
 
 export interface AdminProductImage {
@@ -62,6 +63,7 @@ export interface SiteContentSummary {
   contentKey: string;
   sectionName: string;
   kind: string;
+  videoUrl?: string; 
   textValue?: string;
   mimeType?: string;
   displayLocation?: string;
@@ -320,7 +322,8 @@ getDatabaseSize(): Observable<{ size: string }> {
    * Body: { ids: string[] }
    * Returns: { deleted: number, skipped: string[], message: string }
    */
-  deleteOrders(ids: string[]): Observable<{ deleted: number; skipped: string[]; message: string }> {
+  deleteOrders(ids: string[]): Observable<{ deleted: number; skipped: string[]; message: string }>
+  {
     return this.handle(
       this.http.delete<{ deleted: number; skipped: string[]; message: string }>(
         `${API}/api/admin/orders`,
@@ -332,4 +335,42 @@ getDatabaseSize(): Observable<{ size: string }> {
     );
   
   }
+
+  // ── Product Video ─────────────────────────────────────────────────
+uploadProductVideo(productId: string, file: File): Observable<{ videoUrl: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  const headers = new HttpHeaders({
+    'Authorization': `Bearer ${this.auth.getToken()}`,
+    'X-Admin-PreAuth-Key': this.auth.getPreAuthKey(),
+  });
+  return this.handle(this.http.post<{ videoUrl: string }>(
+    `${API}/api/admin/products/${productId}/video`,
+    form, { headers }
+  ));
+}
+
+deleteProductVideo(productId: string): Observable<void> {
+  return this.handle(this.http.delete<void>(
+    `${API}/api/admin/products/${productId}/video`,
+    { headers: this.headers() }
+  ));
+}
+
+// ── Site Content Video ────────────────────────────────────────────
+uploadSectionVideo(
+    file: File, section: string, contentKey: string,
+    altText: string, sortOrder: number
+  ): Observable<any>
+  {
+    const form = new FormData();
+    form.append('file', file);
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${this.auth.getToken()}`,
+      'X-Admin-PreAuth-Key': this.auth.getPreAuthKey(),
+    });
+    const params = `section=${encodeURIComponent(section)}&contentKey=${encodeURIComponent(contentKey)}&altText=${encodeURIComponent(altText)}&sortOrder=${sortOrder}`;
+    return this.handle(this.http.post<any>(`${API}/api/admin/content/video?${params}`, form, { headers }));
+  }
+
 }

@@ -32,12 +32,13 @@ export interface HighlightCard { icon: string; title: string; body: string; }
     ═══════════════════════════════════════════════════════════════════ -->
     <section class="hero" id="hero">
       <div class="hero-bg">
-        <app-section-slideshow
-          *ngIf="heroImages.length > 0"
-          [images]="heroImages"
-          [interval]="6000">
-        </app-section-slideshow>
-        <div class="hero-bg-fallback" *ngIf="heroImages.length === 0"></div>
+        @if (heroVideo) {
+          <video [src]="heroVideo" autoplay loop muted playsinline class="hero-video"></video>
+        } @else if (heroImages.length > 0) {
+          <app-section-slideshow [images]="heroImages" [interval]="6000"></app-section-slideshow>
+        } @else {
+          <div class="hero-bg-fallback"></div>
+        }
       </div>
       <div class="hero-overlay"></div>
       <div class="hero-content">
@@ -72,8 +73,13 @@ export interface HighlightCard { icon: string; title: string; body: string; }
       <div class="container">
         <div class="feature-grid">
           <div class="feature-img-wrap">
-            <app-section-slideshow *ngIf="feature1Images.length > 0" [images]="feature1Images" [interval]="5500"></app-section-slideshow>
-            <img *ngIf="feature1Images.length === 0" src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop" alt="Crafted by hand" />
+            @if (feature1Video) {
+              <video [src]="feature1Video" autoplay loop muted playsinline class="feature-video"></video>
+            } @else if (feature1Images.length > 0) {
+              <app-section-slideshow [images]="feature1Images" [interval]="5500"></app-section-slideshow>
+            } @else {
+              <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1000&auto=format&fit=crop" alt="Crafted by hand" />
+            }
           </div>
           <div class="feature-text">
             <div class="section-eyebrow eyebrow-left">The Artist's Touch</div>
@@ -96,8 +102,13 @@ export interface HighlightCard { icon: string; title: string; body: string; }
       <div class="container">
         <div class="feature-grid reverse">
           <div class="feature-img-wrap">
-            <app-section-slideshow *ngIf="feature2Images.length > 0" [images]="feature2Images" [interval]="5000"></app-section-slideshow>
-            <img *ngIf="feature2Images.length === 0" src="https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop" alt="Unboxing experience" />
+            @if (feature2Video) {
+              <video [src]="feature2Video" autoplay loop muted playsinline class="feature-video"></video>
+            } @else if (feature2Images.length > 0) {
+              <app-section-slideshow [images]="feature2Images" [interval]="5000"></app-section-slideshow>
+            } @else {
+              <img src="https://images.unsplash.com/photo-1512909006721-3d6018887383?q=80&w=1000&auto=format&fit=crop" alt="Unboxing experience" />
+            }
           </div>
           <div class="feature-text">
             <div class="section-eyebrow eyebrow-left">The Art of Giving</div>
@@ -371,6 +382,22 @@ export interface HighlightCard { icon: string; title: string; body: string; }
     .social-link:hover { color:var(--color-primary) }
     .social-emoji { font-size:1.2rem;width:1.6rem;text-align:center }
     .contact-info-text { font-size:0.88rem;color:var(--color-body);line-height:1.7;white-space:pre-wrap;margin-top:0.5rem }
+
+    /* ── Video elements ── */
+    .hero-video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+    .feature-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
     @keyframes bounce { 0%,100% { transform:translateX(-50%) translateY(0) } 50% { transform:translateX(-50%) translateY(6px) } }
     @media (max-width:900px) { .feature-grid { grid-template-columns:1fr;gap:2.5rem } .feature-grid.reverse { direction:ltr } .feature-img-wrap { aspect-ratio:16/9 } .catalog-header { flex-direction:column;align-items:flex-start } }
     @media (max-width:600px) { .product-grid { grid-template-columns:1fr 1fr;gap:1rem } .manifesto blockquote { padding:0 1rem } .footer-top { flex-direction:column;align-items:center;text-align:center } .footer-bottom { flex-direction:column;align-items:center;text-align:center } .footer-links { justify-content:center;flex-wrap:wrap } }
@@ -389,6 +416,7 @@ export class HomeComponent implements OnInit {
 
   // Hero
   heroImages: string[] = [];
+  heroVideo: string | null = null;
   heroBadge: string | null = null;
   heroHeading: string | null = null;
   heroSubheading: string | null = null;
@@ -400,6 +428,8 @@ export class HomeComponent implements OnInit {
   // Feature sections
   feature1Images: string[] = [];
   feature2Images: string[] = [];
+  feature1Video: string | null = null;
+  feature2Video: string | null = null;
   feature1Para1: string | null = null;
   feature2Para1: string | null = null;
 
@@ -448,6 +478,11 @@ export class HomeComponent implements OnInit {
       this.heroImages     = this.buildImageUrls(items, 'hero');
       this.feature1Images = this.buildImageUrls(items, 'feature-1');
       this.feature2Images = this.buildImageUrls(items, 'feature-2');
+
+      // Video URLs
+      this.heroVideo     = this.getSectionVideo(items, 'hero');
+      this.feature1Video = this.getSectionVideo(items, 'feature-1');
+      this.feature2Video = this.getSectionVideo(items, 'feature-2');
 
       this.heroBadge      = this.getText(items, 'hero.badge');
       this.heroHeading    = this.getText(items, 'hero.heading');
@@ -518,6 +553,12 @@ export class HomeComponent implements OnInit {
       .filter(i => i.sectionName === section && i.kind === 'Image' && i.imageUrl)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(i => resolveSiteImageUrl(i.imageUrl));
+  }
+
+  /** Retrieves the video URL for a given section, if a video item exists */
+  private getSectionVideo(items: SiteContentItem[], section: string): string | null {
+    const video = items.find(i => i.sectionName === section && i.kind === 'Video' && i.videoUrl);
+    return video?.videoUrl ?? null;
   }
 
   private getText(items: SiteContentItem[], key: string): string | null {

@@ -28,7 +28,8 @@ public enum PaymentMethod
 public enum SiteContentItemKind
 {
     Text = 0,
-    Image = 1
+    Image = 1,
+    Video = 2
 }
 
 public enum AuditActionType

@@ -4,6 +4,7 @@ using GiftShop.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using GiftShop.Infrastructure.Services;
 
 namespace GiftShop.Api.Controllers;
 
@@ -22,8 +23,13 @@ namespace GiftShop.Api.Controllers;
 public sealed class AdminSiteContentController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly ICloudinaryService _cloudinary;
 
-    public AdminSiteContentController(ApplicationDbContext db) => _db = db;
+    public AdminSiteContentController(ApplicationDbContext db, ICloudinaryService cloudinary) 
+    { 
+        _db = db;
+        _cloudinary = cloudinary;
+    }
 
     // ── GET /api/admin/content ──────────────────────────────────────────
     [HttpGet]
@@ -35,7 +41,8 @@ public sealed class AdminSiteContentController : ControllerBase
             .Select(i => new SiteContentSummaryDto(
                 i.Id, i.ContentKey, i.SectionName, i.Kind.ToString(),
                 i.TextValue, i.MimeType, i.DisplayLocation, i.AltText,
-                i.SortOrder, i.IsActive, i.BinaryValue != null , i.ExternalImageUrl))
+                i.SortOrder, i.IsActive, i.BinaryValue != null , i.ExternalImageUrl,
+                i.Kind == SiteContentItemKind.Video ? i.VideoUrl : null))
             .ToListAsync();
         return Ok(items);
     }
@@ -43,7 +50,7 @@ public sealed class AdminSiteContentController : ControllerBase
     private sealed record SiteContentSummaryDto(
         Guid Id, string ContentKey, string SectionName, string Kind,
         string? TextValue, string? MimeType, string? DisplayLocation,
-        string? AltText, int SortOrder, bool IsActive, bool HasBinary ,string? ExternalImageUrl);
+        string? AltText, int SortOrder, bool IsActive, bool HasBinary ,string? ExternalImageUrl,string? VideoUrl);
 
     // ── GET /api/content (public: returns text items + image URLs, NOT binary) ─
     [HttpGet("/api/content")]
@@ -69,7 +76,8 @@ public sealed class AdminSiteContentController : ControllerBase
                 // Exrernal-URL images (seeded defaults) are served directly.
                 // The frontend checks imageUrl firts and resolves the right source.
                 // Provide image URL endpoint — binary served separately
-                ImageUrl = i.Kind == SiteContentItemKind.Image ? (i.BinaryValue != null ? $"/api/content/{i.Id}/image" : i.ExternalImageUrl) : null
+                ImageUrl = i.Kind == SiteContentItemKind.Image ? (i.BinaryValue != null ? $"/api/content/{i.Id}/image" : i.ExternalImageUrl) : null,
+                VideoUrl = i.Kind == SiteContentItemKind.Video ? i.VideoUrl : null
             })
             .ToListAsync();
         return Ok(items);
@@ -208,6 +216,10 @@ public sealed class AdminSiteContentController : ControllerBase
     {
         var item = await _db.SiteContentItems.FindAsync(id);
         if (item == null) return NotFound();
+        if (item.Kind == SiteContentItemKind.Video && !string.IsNullOrEmpty(item.VideoPublicId))
+        {
+            try { await _cloudinary.DeleteVideoAsync(item.VideoPublicId); } catch { }
+        }
         _db.SiteContentItems.Remove(item);
         await _db.SaveChangesAsync();
         return NoContent();
@@ -224,4 +236,72 @@ public sealed class AdminSiteContentController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(new { item.Id, item.IsActive });
     }
+
+
+    // ── POST /api/admin/content/video ────────────────────────────────────
+[HttpPost("video")]
+[RequestSizeLimit(10 * 1024 * 1024)]
+public async Task<IActionResult> UploadVideo(
+    IFormFile file,
+    [FromQuery] string section,
+    [FromQuery] string contentKey,
+    [FromQuery] string? altText,
+    [FromQuery] int sortOrder = 0)
+{
+    if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(contentKey))
+        return BadRequest(new { error = "section and contentKey are required." });
+
+    var allowedTypes = new[] { "video/mp4", "video/webm", "video/ogg", "video/quicktime" };
+    if (!allowedTypes.Contains(file.ContentType.ToLower()))
+        return BadRequest(new { error = "Only MP4, WebM, OGG, and MOV videos are allowed." });
+
+    if (file.Length > 8 * 1024 * 1024)
+        return BadRequest(new { error = "File exceeds 8 MB." });
+
+    await using var stream = file.OpenReadStream();
+    var (url, publicId) = await _cloudinary.UploadVideoAsync(stream, file.FileName, "products");
+
+    var existing = await _db.SiteContentItems.FirstOrDefaultAsync(i => i.ContentKey == contentKey);
+    if (existing != null)
+    {
+        // If existing is already a video, delete old Cloudinary asset
+        if (existing.Kind == SiteContentItemKind.Video && !string.IsNullOrEmpty(existing.VideoPublicId))
+        {
+            try { await _cloudinary.DeleteVideoAsync(existing.VideoPublicId); } catch { }
+        }
+        existing.Kind = SiteContentItemKind.Video;
+        existing.VideoUrl = url;
+        existing.VideoPublicId = publicId;
+        existing.MimeType = file.ContentType;
+        existing.AltText = altText ?? existing.AltText;
+        existing.BinaryValue = null; // clear any binary if switching from image
+        existing.ExternalImageUrl = null;
+        existing.IsActive = true;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+    else
+    {
+        var item = new SiteContentItem
+        {
+            ContentKey = contentKey,
+            SectionName = section,
+            Kind = SiteContentItemKind.Video,
+            VideoUrl = url,
+            VideoPublicId = publicId,
+            MimeType = file.ContentType,
+            AltText = altText,
+            SortOrder = sortOrder,
+            IsActive = true
+        };
+        _db.SiteContentItems.Add(item);
+    }
+
+    await _db.SaveChangesAsync();
+    var saved = await _db.SiteContentItems.FirstAsync(i => i.ContentKey == contentKey);
+    return Ok(new
+    {
+        saved.Id, saved.ContentKey, saved.SectionName, saved.Kind,
+        saved.AltText, saved.SortOrder, VideoUrl = saved.VideoUrl
+    });
+ }
 }

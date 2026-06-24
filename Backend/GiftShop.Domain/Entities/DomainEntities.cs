@@ -52,6 +52,12 @@ public sealed class Product : EntityBase
     public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
+
+    [MaxLength(700)]
+    public string? VideoUrl { get; set; }
+
+    [MaxLength(240)]
+    public string? VideoPublicId { get; set; }
 }
 
 public sealed class ProductImage : EntityBase
@@ -225,6 +231,12 @@ public sealed class SiteContentItem : EntityBase
 
     [MaxLength(200)]
     public string? AltText { get; set; }
+
+    [MaxLength(700)]
+    public string? VideoUrl { get; set; }
+
+    [MaxLength(240)]
+    public string? VideoPublicId { get; set; }
 
     /// <summary>
     /// External/CDN image Url (Cloudinary, Unsplash , etc).

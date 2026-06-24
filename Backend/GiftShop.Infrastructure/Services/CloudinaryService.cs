@@ -10,6 +10,8 @@ public interface ICloudinaryService
 {
     Task<(string Url, string PublicId)> UploadProductImageAsync(Stream stream, string fileName);
     Task DeleteImageAsync(string publicId);
+    Task<(string Url, string PublicId)> UploadVideoAsync(Stream stream, string fileName, string folder = "products");
+    Task DeleteVideoAsync(string publicId);
 }
 
 public sealed class CloudinaryService : ICloudinaryService
@@ -56,5 +58,42 @@ public sealed class CloudinaryService : ICloudinaryService
         var result = await _cloudinary.DestroyAsync(deleteParams);
         if (result.Error != null)
             _logger.LogWarning("Cloudinary delete warning for {PublicId}: {Error}", publicId, result.Error.Message);
+    }
+
+    public async Task<(string Url, string PublicId)> UploadVideoAsync(Stream stream, string fileName, string folder = "products")
+    {
+        var uploadParams = new VideoUploadParams
+        {
+            File = new FileDescription(fileName, stream),
+            Folder = folder,
+            // Auto-quality & auto-format (like f_auto,q_auto for images)
+            Transformation = new Transformation().Quality("auto").FetchFormat("auto"),
+            // Overwrite if same public ID (optional, but we generate unique ID per upload)
+            Overwrite = false,
+            // Use the same upload preset if available
+            UploadPreset = "giftopia_preset" // falls back to unsigned if preset doesn't exist
+        };
+
+        var result = await _cloudinary.UploadAsync(uploadParams);
+
+        if (result.Error != null)
+        {
+            _logger.LogError("Cloudinary video upload failed: {Error}", result.Error.Message);
+            throw new InvalidOperationException($"Cloudinary video upload failed: {result.Error.Message}");
+        }
+
+        _logger.LogInformation("Uploaded video to Cloudinary: {PublicId}", result.PublicId);
+        return (result.SecureUrl.ToString(), result.PublicId);
+    }
+
+    public async Task DeleteVideoAsync(string publicId)
+    {
+        var deleteParams = new DeletionParams(publicId)
+        {
+            ResourceType = ResourceType.Video
+        };
+        var result = await _cloudinary.DestroyAsync(deleteParams);
+        if (result.Error != null)
+            _logger.LogWarning("Cloudinary video delete warning for {PublicId}: {Error}", publicId, result.Error.Message);
     }
 }

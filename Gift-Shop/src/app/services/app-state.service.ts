@@ -40,7 +40,8 @@ export interface SiteContentItem {
   id: string;
   contentKey: string;
   sectionName: string;
-  kind: 'Text' | 'Image';
+  kind: 'Text' | 'Image' | 'Video';   // <-- update
+  videoUrl?: string; 
   textValue?: string;
   mimeType?: string;
   displayLocation?: string;

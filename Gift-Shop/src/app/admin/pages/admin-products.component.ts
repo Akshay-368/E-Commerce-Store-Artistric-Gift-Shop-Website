@@ -223,6 +223,37 @@ type Mode = 'list' | 'create' | 'edit';
                   </div>
                 }
               </div>
+
+              <!-- ── Video section (only in edit mode) ── -->
+              @if (mode() === 'edit' && editingProduct()) {
+                <div class="form-card" style="margin-top: 16px;">
+                  <h3 class="form-section-title">Product Video</h3>
+
+                  @if (editingProduct()?.videoUrl) {
+                    <div class="video-preview">
+                      <video [src]="editingProduct()!.videoUrl" controls muted preload="metadata"
+                             style="width:100%; max-height:200px; border-radius:8px;"></video>
+                      <button class="btn-icon danger" style="margin-top:8px;" (click)="deleteVideo()">🗑️ Remove Video</button>
+                    </div>
+                  } @else {
+                    <div class="upload-zone" (click)="videoInput.click()">
+                      <input #videoInput type="file" accept="video/*" style="display:none"
+                             (change)="onVideoSelected($event)" />
+                      <div class="upload-icon">🎥</div>
+                      <p class="upload-label"><strong>Click to upload</strong> a product video</p>
+                      <p class="upload-hint">MP4, WebM, OGG, MOV · Max 8 MB</p>
+                    </div>
+                    @if (videoUploading()) {
+                      <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+                        <span class="spinner-sm"></span> Uploading...
+                      </div>
+                    }
+                    @if (videoError()) {
+                      <div class="alert alert-error" style="margin-top:8px;">{{ videoError() }}</div>
+                    }
+                  }
+                </div>
+              }
             </div>
           </div>
         </div>
@@ -389,6 +420,10 @@ export class AdminProductsComponent implements OnInit {
   isDragOver = signal(false);
   uploadProgress = signal<{ name: string; done: boolean; error?: string }[]>([]);
 
+  // Video state
+  videoUploading = signal(false);
+  videoError = signal('');
+
   form = {
     title: '',
     description: '',
@@ -432,6 +467,8 @@ export class AdminProductsComponent implements OnInit {
     this.formError.set(''); this.formSuccess.set('');
     this.editingProduct.set(null);
     this.uploadProgress.set([]);
+    this.videoUploading.set(false);
+    this.videoError.set('');
     this.mode.set('create');
   }
 
@@ -446,8 +483,10 @@ export class AdminProductsComponent implements OnInit {
       categoryId: p.categoryId ?? '',
     };
     this.formError.set(''); this.formSuccess.set('');
-    this.editingProduct.set({ ...p, images: [...p.images] });
+    this.editingProduct.set({ ...p, images: [...p.images], videoUrl: p.videoUrl });
     this.uploadProgress.set([]);
+    this.videoUploading.set(false);
+    this.videoError.set('');
     this.mode.set('edit');
   }
 
@@ -468,7 +507,6 @@ export class AdminProductsComponent implements OnInit {
     this.formError.set('');
     this.formSuccess.set('');
 
-    // Convert empty string to undefined so the backend treats it as "no category"
     const categoryId = this.form.categoryId || undefined;
 
     if (this.mode() === 'create') {
@@ -483,9 +521,8 @@ export class AdminProductsComponent implements OnInit {
         next: (created) => {
           this.saving.set(false);
           this.formSuccess.set('Product created! You can now upload images.');
-          this.editingProduct.set({ ...created, images: created.images ?? [] });
+          this.editingProduct.set({ ...created, images: created.images ?? [], videoUrl: created.videoUrl });
           this.mode.set('edit');
-          // Asynchronously refresh the public catalog cache
           this.appState.loadProducts();
         },
         error: (err) => {
@@ -507,8 +544,7 @@ export class AdminProductsComponent implements OnInit {
         next: (updated) => {
           this.saving.set(false);
           this.formSuccess.set('Changes saved successfully.');
-          this.editingProduct.set({ ...updated, images: this.editingProduct()!.images });
-          // Asynchronously refresh the public catalog cache
+          this.editingProduct.set({ ...updated, images: this.editingProduct()!.images, videoUrl: updated.videoUrl });
           this.appState.loadProducts();
         },
         error: (err) => {
@@ -587,6 +623,51 @@ export class AdminProductsComponent implements OnInit {
         this.appState.loadProducts();
       },
       error: () => this.formError.set('Failed to set primary image.')
+    });
+  }
+
+  // ── Video methods ──────────────────────────────────────────────────────
+
+  onVideoSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const MAX = 8 * 1024 * 1024;
+    if (file.size > MAX) {
+      this.videoError.set('Video exceeds 8 MB limit.');
+      return;
+    }
+
+    this.videoUploading.set(true);
+    this.videoError.set('');
+
+    const productId = this.editingProduct()!.id;
+    this.api.uploadProductVideo(productId, file).subscribe({
+      next: (res) => {
+        this.videoUploading.set(false);
+        const ep = this.editingProduct()!;
+        this.editingProduct.set({ ...ep, videoUrl: res.videoUrl });
+        this.appState.loadProducts();
+      },
+      error: (err) => {
+        this.videoUploading.set(false);
+        this.videoError.set(err?.error?.error ?? 'Video upload failed.');
+      }
+    });
+    input.value = ''; // reset input
+  }
+
+  deleteVideo() {
+    const product = this.editingProduct();
+    if (!product) return;
+    this.api.deleteProductVideo(product.id).subscribe({
+      next: () => {
+        const ep = this.editingProduct()!;
+        this.editingProduct.set({ ...ep, videoUrl: undefined });
+        this.appState.loadProducts();
+      },
+      error: () => this.formError.set('Failed to delete video.')
     });
   }
 

@@ -45,6 +45,7 @@ public sealed class AdminProductsController : ControllerBase
             {
                 p.Id, p.Title, p.Description, p.ShortDescription,
                 p.Price, p.IsActive, p.SortOrder,
+                VideoUrl = p.VideoUrl,
                 CategoryId = p.CategoryId,
                 CategoryName = p.Category != null ? p.Category.Name : null,
                 Images = p.Images.OrderBy(i => i.SortOrder).Select(i => new
@@ -75,6 +76,7 @@ public sealed class AdminProductsController : ControllerBase
         {
             product.Id, product.Title, product.Description, product.ShortDescription,
             product.Price, product.IsActive, product.SortOrder,
+            VideoUrl = product.VideoUrl,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name,
             Images = product.Images.OrderBy(i => i.SortOrder).Select(i => new
@@ -181,6 +183,13 @@ public sealed class AdminProductsController : ControllerBase
             catch { /* log, continue */ }
         }
 
+        // Delete video if present
+        if (!string.IsNullOrEmpty(product.VideoPublicId))
+        {
+            try { await _cloudinary.DeleteVideoAsync(product.VideoPublicId); }
+            catch { /* log, continue */ }
+        }
+
         _db.Products.Remove(product);
         await _db.SaveChangesAsync();
         await _cache.RefreshCacheAsync();
@@ -269,6 +278,7 @@ public sealed class AdminProductsController : ControllerBase
             p.Id, p.Title, p.Description, p.ShortDescription,
             p.Price, p.IsActive, p.SortOrder,
             CategoryId = p.CategoryId,
+            VideoUrl = p.VideoUrl,
             CategoryName = p.Category?.Name,
             Images = p.Images.OrderBy(i => i.SortOrder).Select(i => new
             {
@@ -280,6 +290,61 @@ public sealed class AdminProductsController : ControllerBase
             })
         };
     }
+
+    // ── POST /api/admin/products/{id}/video ─────────────────────────────
+[HttpPost("{id:guid}/video")]
+[RequestSizeLimit(9 * 1024 * 1024)]
+public async Task<IActionResult> UploadVideo(Guid id, IFormFile file)
+{
+    var product = await _db.Products.FindAsync(id);
+    if (product == null) return NotFound();
+
+    if (file == null || file.Length == 0) return BadRequest(new { error = "No file uploaded." });
+    if (file.Length > 8 * 1024 * 1024) return BadRequest(new { error = "File exceeds 8 MB maximum." });
+
+    var allowedTypes = new[] { "video/mp4", "video/webm", "video/ogg", "video/quicktime" };
+    if (!allowedTypes.Contains(file.ContentType.ToLowerInvariant()))
+        return BadRequest(new { error = "Only MP4, WebM, OGG, and MOV videos are allowed." });
+
+    // Delete old video if present
+    if (!string.IsNullOrEmpty(product.VideoPublicId))
+    {
+        try { await _cloudinary.DeleteVideoAsync(product.VideoPublicId); } catch { /* log, continue */ }
+    }
+
+    await using var stream = file.OpenReadStream();
+    var (url, publicId) = await _cloudinary.UploadVideoAsync(stream, file.FileName, "products");
+
+    product.VideoUrl = url;
+    product.VideoPublicId = publicId;
+    product.UpdatedAt = DateTimeOffset.UtcNow;
+    await _db.SaveChangesAsync();
+    await _cache.RefreshCacheAsync();
+
+    return Ok(new { videoUrl = url });
+}
+
+// ── DELETE /api/admin/products/{id}/video ─────────────────────────────
+[HttpDelete("{id:guid}/video")]
+public async Task<IActionResult> DeleteVideo(Guid id)
+{
+    var product = await _db.Products.FindAsync(id);
+    if (product == null) return NotFound();
+
+    if (!string.IsNullOrEmpty(product.VideoPublicId))
+    {
+        try { await _cloudinary.DeleteVideoAsync(product.VideoPublicId); } catch { /* non-fatal */ }
+    }
+
+    product.VideoUrl = null;
+    product.VideoPublicId = null;
+    product.UpdatedAt = DateTimeOffset.UtcNow;
+    await _db.SaveChangesAsync();
+    await _cache.RefreshCacheAsync();
+    return NoContent();
+}
+
+
 
     private sealed record ProductImageDto(
         Guid Id, string ImageUrl, string OptimizedUrl,

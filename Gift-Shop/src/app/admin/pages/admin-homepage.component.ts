@@ -177,6 +177,31 @@ const SECTIONS: SectionDef[] = [
               </div>
             }
 
+            <!-- ── Section Video (for sections that support video) ── -->
+            @if (sec.hasImages) {
+              <div class="panel-card" style="margin-top: 12px;">
+                <h3 class="panel-title">Section Video</h3>
+                @if (sectionVideo(sec.sectionName); as vid) {
+                  <div class="video-preview">
+                    <video [src]="vid.videoUrl" 
+                           controls muted preload="metadata" style="width:100%; max-height:160px; border-radius:8px;"></video>
+                    <button class="btn-icon danger" style="margin-top:6px;" (click)="deleteSectionVideo(vid)">🗑️ Remove Video</button>
+                  </div>
+                } @else {
+                  <div class="upload-zone" (click)="triggerVideoInput(sec.key)">
+                    <input [id]="'vi-' + sec.key" type="file" accept="video/*" style="display:none"
+                           (change)="onVideoFilesSelected($event, sec)" />
+                    <div class="upload-icon">🎥</div>
+                    <p class="upload-label"><strong>Click to upload</strong> a background video</p>
+                    <p class="upload-hint">MP4, WebM, OGG, MOV · Max 8 MB</p>
+                  </div>
+                  @if (videoUploading(sec.key)) {
+                    <div style="margin-top:6px;"><span class="spinner-sm"></span> Uploading...</div>
+                  }
+                }
+              </div>
+            }
+
             <!-- ── Text content fields ── -->
             @if (sec.textFields.length > 0) {
               <div class="panel-card">
@@ -448,6 +473,10 @@ const SECTIONS: SectionDef[] = [
     .btn-add-card { background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.15); color: #888; border-radius: 8px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
     .btn-add-card:hover { border-color: #88ad35; color: #88ad35; }
 
+    /* Button icon danger (for video removal) */
+    .btn-icon.danger { background: rgba(224,84,84,0.1); border: 1px solid rgba(224,84,84,0.2); color: #e05454; border-radius: 7px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+    .btn-icon.danger:hover { background: rgba(224,84,84,0.2); }
+
     .spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
     .spinner-sm { width: 11px; height: 11px; border: 1.5px solid rgba(255,255,255,0.2); border-top-color: #88ad35; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -486,6 +515,9 @@ export class AdminHomepageComponent implements OnInit {
   savingPayment = signal(false);
   newPayment = { key: '', value: '' };
   editingPaymentId: string | null = null;
+
+  // ── Video upload state ──
+  private videoProgMap: Record<string, boolean> = {};
 
   constructor(private api: AdminApiService, private appState: AppStateService) {}
 
@@ -537,6 +569,14 @@ export class AdminHomepageComponent implements OnInit {
     return this.allContent()
       .filter(i => i.sectionName === sectionName && i.kind === 'Image')
       .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  /**
+   * Returns the video item for a section if one exists.
+   * Requires SiteContentSummary.videoUrl to be populated by the backend.
+   */
+  sectionVideo(sectionName: string): SiteContentSummary | undefined {
+    return this.allContent().find(i => i.sectionName === sectionName && i.kind === 'Video');
   }
 
   imgPreviewUrl(img: SiteContentSummary): string {
@@ -848,6 +888,54 @@ export class AdminHomepageComponent implements OnInit {
         this.appState.loadPaymentDetails();
       },
       error: () => this.globalError.set('Failed to toggle payment detail.')
+    });
+  }
+
+  // ── Video upload methods ─────────────────────────────────────────────
+
+  videoUploading(k: string): boolean {
+    return this.videoProgMap[k] ?? false;
+  }
+
+  triggerVideoInput(sectionKey: string) {
+    (document.getElementById('vi-' + sectionKey) as HTMLInputElement)?.click();
+  }
+
+  onVideoFilesSelected(event: Event, sec: SectionDef) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const MAX = 8 * 1024 * 1024;
+    if (file.size > MAX) {
+      this.globalError.set('Video exceeds 8 MB.');
+      return;
+    }
+    this.videoProgMap[sec.key] = true;
+    const contentKey = `${sec.sectionName}.video`;
+    this.api.uploadSectionVideo(file, sec.sectionName, contentKey, file.name, 0)
+      .subscribe({
+        next: () => {
+          this.videoProgMap[sec.key] = false;
+          this.api.getAllContent().subscribe(items => {
+            this.allContent.set(items);
+            this.appState.loadSiteContent();
+          });
+        },
+        error: (err) => {
+          this.videoProgMap[sec.key] = false;
+          this.globalError.set(err?.error?.error ?? 'Video upload failed.');
+        }
+      });
+    input.value = '';
+  }
+
+  deleteSectionVideo(vid: SiteContentSummary) {
+    this.api.deleteContent(vid.id).subscribe({
+      next: () => {
+        this.allContent.update(prev => prev.filter(i => i.id !== vid.id));
+        this.appState.loadSiteContent();
+      },
+      error: () => this.globalError.set('Failed to delete video.')
     });
   }
 }

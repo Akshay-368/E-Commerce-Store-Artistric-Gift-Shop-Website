@@ -10,3 +10,15 @@ c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj
 c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\refint\GiftShop.Domain.dll
 c:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.pdb
 C:\Users\aksha\E-Commerce Store\E-Commerce-Gift-Shop\Backend\GiftShop.Domain\obj\Debug\net10.0\ref\GiftShop.Domain.dll
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\bin\Debug\net10.0\GiftShop.Domain.deps.json
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\bin\Debug\net10.0\GiftShop.Domain.dll
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\bin\Debug\net10.0\GiftShop.Domain.pdb
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.AssemblyInfoInputs.cache
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.AssemblyInfo.cs
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.csproj.CoreCompileInputs.cache
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.sourcelink.json
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.dll
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\refint\GiftShop.Domain.dll
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\GiftShop.Domain.pdb
+C:\Users\aksha\E-Commerce Store\E-Commerce-Store-Artistric-Gift-Shop-Website\Backend\GiftShop.Domain\obj\Debug\net10.0\ref\GiftShop.Domain.dll

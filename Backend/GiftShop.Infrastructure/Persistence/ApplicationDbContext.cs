@@ -74,6 +74,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
                 .WithOne(x => x.Product)
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.VideoUrl).HasMaxLength(700);
+            entity.Property(x => x.VideoPublicId).HasMaxLength(240);
         });
 
         modelBuilder.Entity<ProductImage>(entity =>
@@ -136,6 +138,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(x => x.TextValue).HasMaxLength(600);
             entity.Property(x => x.BinaryValue).HasColumnType("bytea");
             entity.Property(x => x.ExternalImageUrl).HasMaxLength(700);
+            entity.Property(x => x.VideoUrl).HasMaxLength(700);
+            entity.Property(x => x.VideoPublicId).HasMaxLength(240);
         });
 
         modelBuilder.Entity<AdminAccessBan>(entity =>
