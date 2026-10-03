@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Backend .dockerignore
+# Place this file at:  Backend/.dockerignore
+#
+# Tells Docker which files to exclude when copying the build context.
+# Keeping this list tight means faster builds and no sensitive files in image.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build output directories — never copy these into the Docker build context
+**/bin/
+**/obj/
+
+# .env files — secrets must be injected as environment variables at runtime,
+# never baked into a Docker image
+.env
+.env.*
+*.env
+
+# Git history and GitHub Actions — not needed inside the container
+.git/
+.gitignore
+.github/
+
+# Visual Studio / Rider IDE files
+*.user
+*.suo
+.vs/
+.idea/
+*.DotSettings
+
+# Migration source code (already embedded in the published DLL — no need to copy)
+# Comment this out if you run `dotnet ef database update` inside the container
+# **/Migrations/
+
+# README
+README.md
