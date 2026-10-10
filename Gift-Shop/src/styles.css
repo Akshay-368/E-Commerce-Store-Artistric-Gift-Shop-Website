@@ -1,0 +1,92 @@
+/* Global application styles */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Instrument+Sans:wght@300;400;500;600&family=Inter:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --color-primary: #88ad35;
+  --color-primary-d: #698927;
+  --color-sage: #ecf4d3;
+  --color-sage-m: #d6eaa0;
+  --color-charcoal: #222222;
+  --color-body: #454545;
+  --color-white: #ffffff;
+  --color-border: #d1d1d1;
+  --color-bg: #fafafa;
+  --color-card: #ffffff;
+  --shadow-card: 0 4px 24px rgba(34, 34, 34, 0.08);
+  --shadow-lift: 0 12px 40px rgba(34, 34, 34, 0.14);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Instrument Sans', sans-serif;
+  --font-ui: 'Inter', sans-serif;
+
+  /* Astra compatibility aliases */
+  --ast-global-color-0: #88ad35;
+  --ast-global-color-1: #698927;
+  --ast-global-color-2: #222222;
+  --ast-global-color-3: #454545;
+  --ast-global-color-4: #ecf4d3;
+  --ast-global-color-5: #ffffff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--color-body);
+  background: var(--color-bg);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
