@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="GiftShop.Api/GiftShop.Api.csproj" />
+  <Project Path="GiftShop.Application/GiftShop.Application.csproj" />
+  <Project Path="GiftShop.Domain/GiftShop.Domain.csproj" />
+  <Project Path="GiftShop.Infrastructure/GiftShop.Infrastructure.csproj" />
+</Solution>
